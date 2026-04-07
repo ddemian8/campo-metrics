@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Upload, Image, Keyboard, Shield, Crosshair, Swords, Goal, ChevronLeft, Check, Loader2, FileText, Calendar as CalendarIcon } from "lucide-react";
+import { Upload, Image, Keyboard, Shield, Crosshair, Swords, Goal, ChevronLeft, Check, Loader2, FileText, Calendar as CalendarIcon, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
