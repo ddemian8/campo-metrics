@@ -641,20 +641,31 @@ const Analyze = () => {
                       ))}
                     </div>
 
+                    {renderConsentSection()}
+
                     {(() => {
                       const m = form.manualData;
                       const allRequiredFilled = m.duration && m.distance && m.max_sp && m.sp_ev && m.hmld;
+                      const allConsent = form.consent.public_profile && form.consent.leaderboard && form.consent.terms;
+                      const canSubmit = allRequiredFilled && allConsent;
                       return (
-                        <Button
-                          onClick={handleSubmit}
-                          disabled={!allRequiredFilled}
-                          className={cn(
-                            "mt-8 h-12 px-8 text-base w-full max-w-2xl",
-                            !allRequiredFilled && "opacity-50 cursor-not-allowed"
+                        <>
+                          <Button
+                            onClick={handleSubmit}
+                            disabled={!canSubmit}
+                            className={cn(
+                              "mt-6 h-12 px-8 text-base w-full max-w-2xl",
+                              !canSubmit && "opacity-50 cursor-not-allowed"
+                            )}
+                          >
+                            Generate my report →
+                          </Button>
+                          {!canSubmit && (
+                            <p className="text-[11px] text-muted-foreground mt-2 text-center">
+                              Complete all required fields and accept the consents above to continue.
+                            </p>
                           )}
-                        >
-                          Generate my report →
-                        </Button>
+                        </>
                       );
                     })()}
                   </>
