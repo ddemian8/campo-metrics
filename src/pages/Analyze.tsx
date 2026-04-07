@@ -31,12 +31,18 @@ interface FormState {
   sessionDate: Date;
   gpsFile: File | null;
   manualData: {
+    duration: string;
     distance: string;
-    maxSpeed: string;
-    sprints: string;
+    acc_ev: string;
+    dec_ev: string;
+    dist_sp_z4: string;
+    dist_sp_z4plus: string;
+    dist_sp_z5: string;
+    max_sp: string;
+    av_sp: string;
+    sp_ev: string;
     hmld: string;
-    sprintDistance: string;
-    distanceInPossession: string;
+    athlete_name: string;
   };
 }
 
@@ -72,12 +78,18 @@ const Analyze = () => {
     sessionDate: new Date(),
     gpsFile: null,
     manualData: {
+      duration: "",
       distance: "",
-      maxSpeed: "",
-      sprints: "",
+      acc_ev: "",
+      dec_ev: "",
+      dist_sp_z4: "",
+      dist_sp_z4plus: "",
+      dist_sp_z5: "",
+      max_sp: "",
+      av_sp: "",
+      sp_ev: "",
       hmld: "",
-      sprintDistance: "",
-      distanceInPossession: "",
+      athlete_name: "",
     },
   });
 
@@ -91,6 +103,11 @@ const Analyze = () => {
       ...prev,
       manualData: { ...prev.manualData, [field]: value },
     }));
+    setErrors((prev) => {
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
   }, []);
 
   const goNext = useCallback(() => setStep((s) => Math.min(s + 1, 7)), []);
@@ -132,9 +149,11 @@ const Analyze = () => {
       if (!form.league.trim()) e.league = "Required";
     }
     if (s === 7 && form.entryMethod === "manual") {
+      if (!form.manualData.duration) e.duration = "Required";
+      else if (!/^\d{1,3}:\d{2}$/.test(form.manualData.duration)) e.duration = "Please use mm:ss format (e.g. 08:24)";
       if (!form.manualData.distance) e.distance = "Required";
-      if (!form.manualData.maxSpeed) e.maxSpeed = "Required";
-      if (!form.manualData.sprints) e.sprints = "Required";
+      if (!form.manualData.max_sp) e.max_sp = "Required";
+      if (!form.manualData.sp_ev) e.sp_ev = "Required";
       if (!form.manualData.hmld) e.hmld = "Required";
     }
     setErrors(e);
