@@ -14,7 +14,192 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      players: {
+        Row: {
+          age_calculated: number | null
+          country: string | null
+          created_at: string
+          date_of_birth: string | null
+          first_name: string
+          height_cm: number | null
+          id: string
+          last_name: string
+          league: string | null
+          position: string | null
+          team_name: string | null
+          transfermarkt_club: string | null
+          transfermarkt_league: string | null
+          transfermarkt_url: string | null
+          updated_at: string
+          user_id: string | null
+          weight_kg: number | null
+        }
+        Insert: {
+          age_calculated?: number | null
+          country?: string | null
+          created_at?: string
+          date_of_birth?: string | null
+          first_name: string
+          height_cm?: number | null
+          id?: string
+          last_name: string
+          league?: string | null
+          position?: string | null
+          team_name?: string | null
+          transfermarkt_club?: string | null
+          transfermarkt_league?: string | null
+          transfermarkt_url?: string | null
+          updated_at?: string
+          user_id?: string | null
+          weight_kg?: number | null
+        }
+        Update: {
+          age_calculated?: number | null
+          country?: string | null
+          created_at?: string
+          date_of_birth?: string | null
+          first_name?: string
+          height_cm?: number | null
+          id?: string
+          last_name?: string
+          league?: string | null
+          position?: string | null
+          team_name?: string | null
+          transfermarkt_club?: string | null
+          transfermarkt_league?: string | null
+          transfermarkt_url?: string | null
+          updated_at?: string
+          user_id?: string | null
+          weight_kg?: number | null
+        }
+        Relationships: []
+      }
+      sessions: {
+        Row: {
+          acc_ev: number | null
+          age_calculated: number | null
+          athlete_name: string | null
+          av_sp: number | null
+          consent_leaderboard: boolean | null
+          consent_public_profile: boolean | null
+          consent_terms: boolean | null
+          consent_timestamp: string | null
+          country: string | null
+          created_at: string
+          date_of_birth: string | null
+          dec_ev: number | null
+          dist_sp_z4: number | null
+          dist_sp_z4plus: number | null
+          dist_sp_z5: number | null
+          distance: number | null
+          duration: string | null
+          entry_method: string | null
+          first_name: string
+          height_cm: number | null
+          hmld: number | null
+          id: string
+          last_name: string
+          league: string | null
+          max_sp: number | null
+          md_day: string | null
+          opponent: string | null
+          position: string | null
+          session_date: string | null
+          session_type: string | null
+          sp_ev: number | null
+          status: string | null
+          team_name: string | null
+          transfermarkt_club: string | null
+          transfermarkt_league: string | null
+          transfermarkt_url: string | null
+          updated_at: string
+          user_id: string | null
+          weight_kg: number | null
+        }
+        Insert: {
+          acc_ev?: number | null
+          age_calculated?: number | null
+          athlete_name?: string | null
+          av_sp?: number | null
+          consent_leaderboard?: boolean | null
+          consent_public_profile?: boolean | null
+          consent_terms?: boolean | null
+          consent_timestamp?: string | null
+          country?: string | null
+          created_at?: string
+          date_of_birth?: string | null
+          dec_ev?: number | null
+          dist_sp_z4?: number | null
+          dist_sp_z4plus?: number | null
+          dist_sp_z5?: number | null
+          distance?: number | null
+          duration?: string | null
+          entry_method?: string | null
+          first_name: string
+          height_cm?: number | null
+          hmld?: number | null
+          id?: string
+          last_name: string
+          league?: string | null
+          max_sp?: number | null
+          md_day?: string | null
+          opponent?: string | null
+          position?: string | null
+          session_date?: string | null
+          session_type?: string | null
+          sp_ev?: number | null
+          status?: string | null
+          team_name?: string | null
+          transfermarkt_club?: string | null
+          transfermarkt_league?: string | null
+          transfermarkt_url?: string | null
+          updated_at?: string
+          user_id?: string | null
+          weight_kg?: number | null
+        }
+        Update: {
+          acc_ev?: number | null
+          age_calculated?: number | null
+          athlete_name?: string | null
+          av_sp?: number | null
+          consent_leaderboard?: boolean | null
+          consent_public_profile?: boolean | null
+          consent_terms?: boolean | null
+          consent_timestamp?: string | null
+          country?: string | null
+          created_at?: string
+          date_of_birth?: string | null
+          dec_ev?: number | null
+          dist_sp_z4?: number | null
+          dist_sp_z4plus?: number | null
+          dist_sp_z5?: number | null
+          distance?: number | null
+          duration?: string | null
+          entry_method?: string | null
+          first_name?: string
+          height_cm?: number | null
+          hmld?: number | null
+          id?: string
+          last_name?: string
+          league?: string | null
+          max_sp?: number | null
+          md_day?: string | null
+          opponent?: string | null
+          position?: string | null
+          session_date?: string | null
+          session_type?: string | null
+          sp_ev?: number | null
+          status?: string | null
+          team_name?: string | null
+          transfermarkt_club?: string | null
+          transfermarkt_league?: string | null
+          transfermarkt_url?: string | null
+          updated_at?: string
+          user_id?: string | null
+          weight_kg?: number | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
