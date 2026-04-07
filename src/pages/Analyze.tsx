@@ -812,13 +812,31 @@ const Analyze = () => {
                         </div>
                       )}
                     </div>
-                    <Button
-                      onClick={handleSubmit}
-                      disabled={!form.gpsFile}
-                      className="mt-8 h-12 px-8 text-base"
-                    >
-                      Analyse my session →
-                    </Button>
+                    {renderConsentSection()}
+
+                    {(() => {
+                      const allConsent = form.consent.public_profile && form.consent.leaderboard && form.consent.terms;
+                      const canSubmit = form.gpsFile && allConsent;
+                      return (
+                        <>
+                          <Button
+                            onClick={handleSubmit}
+                            disabled={!canSubmit}
+                            className={cn(
+                              "mt-6 h-12 px-8 text-base",
+                              !canSubmit && "opacity-50 cursor-not-allowed"
+                            )}
+                          >
+                            Analyse my session →
+                          </Button>
+                          {!canSubmit && (
+                            <p className="text-[11px] text-muted-foreground mt-2 text-center">
+                              Complete all required fields and accept the consents above to continue.
+                            </p>
+                          )}
+                        </>
+                      );
+                    })()}
                   </>
                 )}
               </div>
