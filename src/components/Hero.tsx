@@ -1,0 +1,67 @@
+import { Link } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import { ArrowRight } from "lucide-react";
+import AnimateIn from "./AnimateIn";
+
+const metrics = [
+  { label: "Distance", value: "11.2 km" },
+  { label: "Max Speed", value: "32.4 km/h" },
+  { label: "Sprints", value: "24" },
+  { label: "HMLD", value: "1,840 m" },
+];
+
+const Hero = () => (
+  <section className="relative pt-32 pb-20 md:pt-40 md:pb-28 overflow-hidden">
+    <div className="container">
+      <div className="grid lg:grid-cols-2 gap-12 items-center">
+        <AnimateIn>
+          <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold leading-tight tracking-tight">
+            Your GPS data.{" "}
+            <span className="text-gradient">Your performance story.</span>
+          </h1>
+          <p className="mt-6 text-lg text-muted-foreground max-w-xl leading-relaxed">
+            Upload your team's GPS session file and get an instant AI-powered personal performance report — in under 90 seconds. No account required to start.
+          </p>
+          <div className="mt-8 flex flex-wrap gap-4">
+            <Button size="lg" asChild>
+              <Link to="/analyze">
+                Start your analysis <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+            </Button>
+            <Button size="lg" variant="outline" asChild>
+              <a href="#sample-report">See a sample report</a>
+            </Button>
+          </div>
+          <p className="mt-6 text-sm text-muted-foreground">
+            Free to start · No credit card required · Works with STATSports, Catapult & more
+          </p>
+        </AnimateIn>
+
+        <AnimateIn delay={0.2} className="flex justify-center">
+          <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-6 glow-blue">
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <p className="text-xs text-muted-foreground">Match Report</p>
+                <p className="font-semibold text-foreground">João Silva</p>
+                <p className="text-xs text-muted-foreground">CM · FC Demo</p>
+              </div>
+              <div className="h-16 w-16 rounded-full bg-success/15 flex items-center justify-center">
+                <span className="text-2xl font-bold text-success">87</span>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              {metrics.map((m) => (
+                <div key={m.label} className="rounded-lg bg-secondary p-3">
+                  <p className="text-xs text-muted-foreground">{m.label}</p>
+                  <p className="text-lg font-semibold text-foreground">{m.value}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </AnimateIn>
+      </div>
+    </div>
+  </section>
+);
+
+export default Hero;
