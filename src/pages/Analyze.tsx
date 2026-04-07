@@ -96,7 +96,24 @@ const Analyze = () => {
       hmld: "",
       athlete_name: "",
     },
+    consent: {
+      public_profile: false,
+      leaderboard: false,
+      terms: false,
+    },
   });
+
+  const updateConsent = useCallback((field: keyof FormState['consent'], value: boolean) => {
+    setForm((prev) => ({
+      ...prev,
+      consent: { ...prev.consent, [field]: value },
+    }));
+    setErrors((prev) => {
+      const next = { ...prev };
+      delete next[`consent_${field}`];
+      return next;
+    });
+  }, []);
 
   const updateForm = useCallback((updates: Partial<FormState>) => {
     setForm((prev) => ({ ...prev, ...updates }));
