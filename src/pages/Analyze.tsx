@@ -44,6 +44,11 @@ interface FormState {
     hmld: string;
     athlete_name: string;
   };
+  consent: {
+    public_profile: boolean;
+    leaderboard: boolean;
+    terms: boolean;
+  };
 }
 
 const stepVariants = {
