@@ -559,35 +559,79 @@ const Analyze = () => {
 
                 {form.entryMethod === "manual" ? (
                   <>
-                    <h1 className="text-3xl sm:text-4xl font-bold text-foreground mb-8">Enter your GPS data</h1>
-                    <div className="grid grid-cols-2 gap-4 max-w-lg mx-auto text-left">
-                      {[
-                        { key: "distance", label: "Total Distance (km)", ph: "11.4" },
-                        { key: "maxSpeed", label: "Max Speed (km/h)", ph: "32.1" },
-                        { key: "sprints", label: "Sprint Count", ph: "24" },
-                        { key: "hmld", label: "HMLD (m)", ph: "1920" },
-                        { key: "sprintDistance", label: "Sprint Distance (m)", ph: "Optional" },
-                        { key: "distanceInPossession", label: "Distance in Poss. (m)", ph: "Optional" },
-                      ].map((f) => (
-                        <div key={f.key}>
-                          <label className="text-xs text-muted-foreground mb-1 block">{f.label}</label>
-                          <Input
-                            type="number"
+                    <h1 className="text-3xl sm:text-4xl font-bold text-foreground mb-6">Enter your GPS data</h1>
+
+                    <div className="flex items-start gap-3 rounded-lg border border-primary/30 bg-primary/5 p-3 max-w-2xl mx-auto mb-6 text-left">
+                      <Info className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                      <p className="text-xs text-muted-foreground">
+                        You can find these values in your GPS platform export. Column names may vary slightly by platform (STATSports, Catapult, gpexe).
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-2xl mx-auto text-left">
+                      {([
+                        { key: "duration", label: "Duration", unit: "mm:ss", type: "text", ph: "e.g. 08:24", required: true },
+                        { key: "dist_sp_z5", label: "Dist / Speed Zone 5", unit: "m", type: "number", ph: "e.g. 0.0", required: false },
+                        { key: "distance", label: "Distance", unit: "m", type: "number", ph: "e.g. 1045.9", required: true },
+                        { key: "max_sp", label: "Max Speed", unit: "km/h", type: "number", ph: "e.g. 24.1", required: true },
+                        { key: "acc_ev", label: "Acceleration events", unit: "count", type: "number", ph: "e.g. 12", required: false },
+                        { key: "av_sp", label: "Average Speed", unit: "km/h", type: "number", ph: "e.g. 7.5", required: false },
+                        { key: "dec_ev", label: "Deceleration events", unit: "count", type: "number", ph: "e.g. 8", required: false },
+                        { key: "sp_ev", label: "Speed events", unit: "count", type: "number", ph: "e.g. 7", required: true },
+                        { key: "dist_sp_z4", label: "Dist / Speed Zone 4", unit: "m", type: "number", ph: "e.g. 54.0", required: false },
+                        { key: "hmld", label: "HMLD", unit: "m", type: "number", ph: "e.g. 173.0", required: true },
+                        { key: "dist_sp_z4plus", label: "Dist / Speed Zone 4+", unit: "m", type: "number", ph: "e.g. 54.0", required: false },
+                        { key: "athlete_name", label: "Athlete name", unit: "as shown in GPS file", type: "text", ph: "e.g. Rotaru N.", required: false },
+                      ] as const).map((f) => (
+                        <div
+                          key={f.key}
+                          className={cn(
+                            "rounded-lg border border-border/50 bg-[#0d1f35] p-3.5 transition-all focus-within:border-primary"
+                          )}
+                        >
+                          <div className="flex items-center gap-1.5 mb-0.5">
+                            <label className="text-[13px] font-medium text-foreground">{f.label}</label>
+                            {f.required && <span className="text-red-500 text-xs">•</span>}
+                            {!f.required && (
+                              <span className="text-[10px] text-muted-foreground bg-muted/30 px-1.5 py-0.5 rounded-full">Optional</span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-muted-foreground mb-2">{f.unit}</p>
+                          <input
+                            type={f.type}
+                            inputMode={f.type === "number" ? "decimal" : undefined}
+                            min={f.type === "number" ? 0 : undefined}
+                            step={f.type === "number" ? "any" : undefined}
                             placeholder={f.ph}
                             value={(form.manualData as any)[f.key]}
                             onChange={(e) => updateManual(f.key, e.target.value)}
-                            className="h-11 bg-secondary border-border"
+                            className="w-full bg-transparent text-foreground text-base outline-none placeholder:text-muted-foreground/40"
                           />
-                          {(errors as any)[f.key] && (
-                            <p className="text-destructive text-xs mt-1">{(errors as any)[f.key]}</p>
+                          {errors[f.key] && (
+                            <p className="text-[11px] text-red-500 mt-1.5">{errors[f.key]}</p>
                           )}
                         </div>
                       ))}
                     </div>
-                    <Button onClick={handleSubmit} className="mt-8 h-12 px-8 text-base">
-                      Generate my report →
-                    </Button>
+
+                    {(() => {
+                      const m = form.manualData;
+                      const allRequiredFilled = m.duration && m.distance && m.max_sp && m.sp_ev && m.hmld;
+                      return (
+                        <Button
+                          onClick={handleSubmit}
+                          disabled={!allRequiredFilled}
+                          className={cn(
+                            "mt-8 h-12 px-8 text-base w-full max-w-2xl",
+                            !allRequiredFilled && "opacity-50 cursor-not-allowed"
+                          )}
+                        >
+                          Generate my report →
+                        </Button>
+                      );
+                    })()}
                   </>
+                )
                 ) : (
                   <>
                     <h1 className="text-3xl sm:text-4xl font-bold text-foreground mb-8">
