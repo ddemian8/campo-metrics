@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Upload, Image, Keyboard, Shield, Crosshair, Swords, Goal, ChevronLeft, Check, Loader2, FileText, Calendar as CalendarIcon, Info } from "lucide-react";
+import { Upload, Image, Keyboard, Shield, Crosshair, Swords, Goal, ChevronLeft, Check, Loader2, FileText, Calendar as CalendarIcon, Info, AlertTriangle, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
@@ -9,22 +9,37 @@ import { Badge } from "@/components/ui/badge";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { format } from "date-fns";
+import { format, differenceInYears, subYears } from "date-fns";
+import { supabase } from "@/integrations/supabase/client";
 
 type EntryMethod = "pdf" | "screenshot" | "manual";
 type Position = "GK" | "DEF" | "MID" | "FWD";
 type SessionType = "match" | "training";
 type MDDay = "MD-2" | "MD-1" | "MD0" | "MD+1" | "MD+2" | "other";
 
+interface TransfermarktData {
+  club: string | null;
+  league: string | null;
+  nationality: string | null;
+  market_value: string | null;
+  fetched: boolean;
+}
+
 interface FormState {
   entryMethod: EntryMethod | null;
   firstName: string;
   lastName: string;
-  age: string;
-  weight: string;
+  transfermarkt_url: string;
+  transfermarkt_data: TransfermarktData;
+  transfermarkt_status: "idle" | "loading" | "success" | "error";
+  date_of_birth: Date | undefined;
+  age_calculated: number | null;
+  height_cm: string;
+  weight_kg: string;
   position: Position | null;
   teamName: string;
   league: string;
+  country: string;
   sessionType: SessionType | null;
   mdDay: MDDay;
   opponent: string;
@@ -72,11 +87,17 @@ const Analyze = () => {
     entryMethod: null,
     firstName: "",
     lastName: "",
-    age: "",
-    weight: "",
+    transfermarkt_url: "",
+    transfermarkt_data: { club: null, league: null, nationality: null, market_value: null, fetched: false },
+    transfermarkt_status: "idle",
+    date_of_birth: undefined,
+    age_calculated: null,
+    height_cm: "",
+    weight_kg: "",
     position: null,
     teamName: "",
     league: "",
+    country: "",
     sessionType: null,
     mdDay: "MD0",
     opponent: "",
@@ -156,15 +177,68 @@ const Analyze = () => {
     return () => timers.forEach(clearTimeout);
   }, [isLoading, navigate]);
 
+  // Calculate age when DOB changes
+  useEffect(() => {
+    if (form.date_of_birth) {
+      const age = differenceInYears(new Date(), form.date_of_birth);
+      setForm(prev => ({ ...prev, age_calculated: age }));
+    }
+  }, [form.date_of_birth]);
+
+  const fetchTransfermarkt = useCallback(async (url: string) => {
+    if (!url || !url.includes('transfermarkt.com')) return;
+
+    setForm(prev => ({ ...prev, transfermarkt_status: "loading" }));
+
+    try {
+      const { data, error } = await supabase.functions.invoke('fetch-transfermarkt', {
+        body: { url },
+      });
+
+      if (error || !data?.success) {
+        setForm(prev => ({
+          ...prev,
+          transfermarkt_status: "error",
+          transfermarkt_data: { ...prev.transfermarkt_data, fetched: false },
+        }));
+        return;
+      }
+
+      setForm(prev => ({
+        ...prev,
+        transfermarkt_status: "success",
+        transfermarkt_data: {
+          club: data.club,
+          league: data.league,
+          nationality: data.nationality,
+          market_value: data.market_value,
+          fetched: true,
+        },
+        teamName: data.club || prev.teamName,
+        league: data.league || prev.league,
+      }));
+    } catch {
+      setForm(prev => ({ ...prev, transfermarkt_status: "error" }));
+    }
+  }, []);
+
   const validateStep = (s: number): boolean => {
     const e: Record<string, string> = {};
     if (s === 2) {
       if (!form.firstName.trim() || !form.lastName.trim())
         e.name = "Please enter your full name";
+      if (form.transfermarkt_url && !form.transfermarkt_url.includes('transfermarkt.com'))
+        e.transfermarkt = "Please paste a valid Transfermarkt profile URL (transfermarkt.com)";
     }
     if (s === 3) {
-      if (!form.age) e.age = "Required";
-      if (!form.weight) e.weight = "Required";
+      if (!form.date_of_birth) e.dob = "Required";
+      else if (form.age_calculated !== null && form.age_calculated < 14)
+        e.dob = "You must be at least 14 years old to use Campometric.";
+      if (!form.height_cm) e.height = "Required";
+      else {
+        const h = parseInt(form.height_cm);
+        if (h < 140 || h > 220) e.height = "Please enter a valid height in cm (140–220)";
+      }
     }
     if (s === 5) {
       if (!form.teamName.trim()) e.team = "Required";
@@ -191,9 +265,74 @@ const Analyze = () => {
     if (validateStep(step)) goNext();
   }, [step, form]);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!validateStep(7)) return;
     setIsLoading(true);
+
+    try {
+      const sessionId = crypto.randomUUID();
+
+      // Insert into sessions table
+      await supabase.from('sessions').insert({
+        id: sessionId,
+        first_name: form.firstName,
+        last_name: form.lastName,
+        date_of_birth: form.date_of_birth ? format(form.date_of_birth, 'yyyy-MM-dd') : null,
+        age_calculated: form.age_calculated,
+        height_cm: form.height_cm ? parseInt(form.height_cm) : null,
+        weight_kg: form.weight_kg ? parseInt(form.weight_kg) : null,
+        position: form.position,
+        team_name: form.teamName,
+        league: form.league,
+        country: form.country || null,
+        transfermarkt_url: form.transfermarkt_url || null,
+        transfermarkt_club: form.transfermarkt_data.club,
+        transfermarkt_league: form.transfermarkt_data.league,
+        session_type: form.sessionType,
+        md_day: form.mdDay,
+        opponent: form.opponent || null,
+        session_date: format(form.sessionDate, 'yyyy-MM-dd'),
+        entry_method: form.entryMethod,
+        duration: form.manualData.duration || null,
+        distance: form.manualData.distance ? parseFloat(form.manualData.distance) : null,
+        acc_ev: form.manualData.acc_ev ? parseFloat(form.manualData.acc_ev) : null,
+        dec_ev: form.manualData.dec_ev ? parseFloat(form.manualData.dec_ev) : null,
+        dist_sp_z4: form.manualData.dist_sp_z4 ? parseFloat(form.manualData.dist_sp_z4) : null,
+        dist_sp_z4plus: form.manualData.dist_sp_z4plus ? parseFloat(form.manualData.dist_sp_z4plus) : null,
+        dist_sp_z5: form.manualData.dist_sp_z5 ? parseFloat(form.manualData.dist_sp_z5) : null,
+        max_sp: form.manualData.max_sp ? parseFloat(form.manualData.max_sp) : null,
+        av_sp: form.manualData.av_sp ? parseFloat(form.manualData.av_sp) : null,
+        sp_ev: form.manualData.sp_ev ? parseFloat(form.manualData.sp_ev) : null,
+        hmld: form.manualData.hmld ? parseFloat(form.manualData.hmld) : null,
+        athlete_name: form.manualData.athlete_name || null,
+        consent_public_profile: form.consent.public_profile,
+        consent_leaderboard: form.consent.leaderboard,
+        consent_terms: form.consent.terms,
+        consent_timestamp: new Date().toISOString(),
+        status: 'processing',
+      } as any);
+
+      // Insert into players table
+      await supabase.from('players').insert({
+        first_name: form.firstName,
+        last_name: form.lastName,
+        date_of_birth: form.date_of_birth ? format(form.date_of_birth, 'yyyy-MM-dd') : null,
+        age_calculated: form.age_calculated,
+        height_cm: form.height_cm ? parseInt(form.height_cm) : null,
+        weight_kg: form.weight_kg ? parseInt(form.weight_kg) : null,
+        position: form.position,
+        team_name: form.teamName,
+        league: form.league,
+        country: form.country || null,
+        transfermarkt_url: form.transfermarkt_url || null,
+        transfermarkt_club: form.transfermarkt_data.club,
+        transfermarkt_league: form.transfermarkt_data.league,
+      } as any);
+
+      // Navigate happens via loading effect
+    } catch (err) {
+      console.error('Error saving session:', err);
+    }
   };
 
   const consentCheckboxes = [
@@ -219,23 +358,16 @@ const Analyze = () => {
 
   const renderConsentSection = () => (
     <div className="max-w-2xl mx-auto mt-8 text-left">
-      {/* Divider */}
       <div className="h-px bg-muted-foreground/20 mb-6" />
-
-      {/* Section title */}
       <p className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground font-medium mb-4">
         Data Visibility & Consent
       </p>
-
-      {/* Info banner */}
       <div className="flex items-start gap-3 rounded-lg border-l-[3px] border-primary bg-[#0d2a4a] p-3 mb-5">
         <Shield className="h-4 w-4 text-primary shrink-0 mt-0.5" />
         <p className="text-[11px] text-[#a8c0e0] leading-relaxed">
           Your data is protected. Campometric stores your information securely and never sells your personal data to third parties. You can withdraw consent and delete your data at any time from your account settings.
         </p>
       </div>
-
-      {/* Checkboxes */}
       <div className="space-y-3.5">
         {consentCheckboxes.map((cb) => (
           <div key={cb.id}>
@@ -260,26 +392,9 @@ const Analyze = () => {
                 {cb.id === "terms" ? (
                   <p className="text-[13px] text-foreground leading-relaxed">
                     I have read and agree to the Campometric{" "}
-                    <a
-                      href="/terms"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={(e) => e.stopPropagation()}
-                      className="text-primary underline-offset-2 hover:underline"
-                    >
-                      Terms of Service
-                    </a>{" "}
+                    <a href="/terms" target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="text-primary underline-offset-2 hover:underline">Terms of Service</a>{" "}
                     and{" "}
-                    <a
-                      href="/privacy"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={(e) => e.stopPropagation()}
-                      className="text-primary underline-offset-2 hover:underline"
-                    >
-                      Privacy Policy
-                    </a>
-                    .
+                    <a href="/privacy" target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="text-primary underline-offset-2 hover:underline">Privacy Policy</a>.
                   </p>
                 ) : (
                   <p className="text-[13px] text-foreground leading-relaxed">{cb.label}</p>
@@ -373,6 +488,9 @@ const Analyze = () => {
     );
   }
 
+  const maxDob = subYears(new Date(), 14);
+  const minDob = subYears(new Date(), 50);
+
   return (
     <div className="min-h-screen bg-background flex flex-col" onKeyDown={handleKeyDown}>
       {/* Progress bar */}
@@ -444,7 +562,7 @@ const Analyze = () => {
               </div>
             )}
 
-            {/* STEP 2 */}
+            {/* STEP 2 — Name + Transfermarkt */}
             {step === 2 && (
               <div>
                 <h1 className="text-3xl sm:text-4xl font-bold text-foreground mb-10">What's your name?</h1>
@@ -464,40 +582,140 @@ const Analyze = () => {
                   />
                 </div>
                 {errors.name && <p className="text-destructive text-sm mt-3">{errors.name}</p>}
+
+                {/* Transfermarkt field */}
+                <div className="max-w-md mx-auto mt-6 text-left">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <label className="text-[13px] font-medium text-foreground">Transfermarkt profile</label>
+                    <span className="text-[10px] text-muted-foreground bg-muted/30 px-1.5 py-0.5 rounded-full">Optional</span>
+                    <span className="text-[10px] bg-[#0d3320] text-[#1db954] px-2 py-0.5 rounded-full font-medium">Auto-fill ✓</span>
+                  </div>
+                  <Input
+                    placeholder="https://www.transfermarkt.com/your-name/profil/spieler/..."
+                    value={form.transfermarkt_url}
+                    onChange={(e) => updateForm({ transfermarkt_url: e.target.value })}
+                    onBlur={() => {
+                      if (form.transfermarkt_url && form.transfermarkt_url.includes('transfermarkt.com')) {
+                        fetchTransfermarkt(form.transfermarkt_url);
+                      }
+                    }}
+                    className="text-sm h-11 bg-secondary border-border"
+                  />
+                  <p className="text-[11px] text-muted-foreground mt-1.5">
+                    If you have a Transfermarkt profile, paste the link here. We'll automatically fill in your team and league.
+                  </p>
+                  {errors.transfermarkt && <p className="text-[11px] text-destructive mt-1">{errors.transfermarkt}</p>}
+
+                  {form.transfermarkt_status === "loading" && (
+                    <div className="flex items-center gap-2 mt-2 text-[12px] text-muted-foreground">
+                      <Loader2 className="h-3 w-3 animate-spin" /> Fetching your profile...
+                    </div>
+                  )}
+                  {form.transfermarkt_status === "success" && (
+                    <div className="flex items-start gap-2 rounded-lg bg-[#0d3320] border border-[#1db954]/30 p-3 mt-2">
+                      <Check className="h-4 w-4 text-[#1db954] shrink-0 mt-0.5" />
+                      <p className="text-[12px] text-[#1db954]">
+                        Profile found! Team and league have been filled in automatically.
+                      </p>
+                    </div>
+                  )}
+                  {form.transfermarkt_status === "error" && (
+                    <div className="flex items-start gap-2 rounded-lg bg-[#2a1f00] border border-amber-500/30 p-3 mt-2">
+                      <AlertTriangle className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
+                      <p className="text-[12px] text-amber-300">
+                        We couldn't find this Transfermarkt profile. You can still continue and fill in your team manually.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
                 <Button onClick={handleContinue} className="mt-8 h-12 px-8 text-base">Continue →</Button>
               </div>
             )}
 
-            {/* STEP 3 */}
+            {/* STEP 3 — DOB, Height, Weight */}
             {step === 3 && (
               <div>
                 <h1 className="text-3xl sm:text-4xl font-bold text-foreground mb-10">
-                  How old are you and what is your weight?
+                  Tell us a bit more about you
                 </h1>
-                <div className="flex gap-4 max-w-sm mx-auto">
-                  <div className="flex-1">
-                    <Input
-                      type="number"
-                      placeholder="Age (years)"
-                      min={14}
-                      max={50}
-                      value={form.age}
-                      onChange={(e) => updateForm({ age: e.target.value })}
-                      className="text-center text-lg h-12 bg-secondary border-border"
-                    />
-                    {errors.age && <p className="text-destructive text-xs mt-1">{errors.age}</p>}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-xl mx-auto text-left">
+                  {/* Date of Birth */}
+                  <div className="rounded-lg border border-border/50 bg-[#0d1f35] p-3.5 focus-within:border-primary transition-all">
+                    <div className="flex items-center gap-1.5 mb-0.5">
+                      <label className="text-[13px] font-medium text-foreground">Date of birth</label>
+                      <span className="text-red-500 text-xs">•</span>
+                    </div>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          className={cn(
+                            "w-full justify-start text-left font-normal h-10 px-0 hover:bg-transparent",
+                            !form.date_of_birth && "text-muted-foreground/40"
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {form.date_of_birth ? format(form.date_of_birth, "dd / MM / yyyy") : "DD / MM / YYYY"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={form.date_of_birth}
+                          onSelect={(d) => d && updateForm({ date_of_birth: d })}
+                          disabled={(date) => date > maxDob || date < minDob}
+                          defaultMonth={maxDob}
+                          className="p-3 pointer-events-auto"
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    {form.date_of_birth && form.age_calculated !== null && (
+                      <p className="text-[13px] text-[#1db954] font-bold mt-1">
+                        Age: {form.age_calculated} years old
+                      </p>
+                    )}
+                    {errors.dob && <p className="text-[11px] text-destructive mt-1">{errors.dob}</p>}
                   </div>
-                  <div className="flex-1">
-                    <Input
+
+                  {/* Height */}
+                  <div className="rounded-lg border border-border/50 bg-[#0d1f35] p-3.5 focus-within:border-primary transition-all">
+                    <div className="flex items-center gap-1.5 mb-0.5">
+                      <label className="text-[13px] font-medium text-foreground">Height</label>
+                      <span className="text-red-500 text-xs">•</span>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground mb-2">cm</p>
+                    <input
                       type="number"
-                      placeholder="Weight (kg)"
+                      inputMode="numeric"
+                      min={140}
+                      max={220}
+                      placeholder="e.g. 181"
+                      value={form.height_cm}
+                      onChange={(e) => updateForm({ height_cm: e.target.value })}
+                      className="w-full bg-transparent text-foreground text-base outline-none placeholder:text-muted-foreground/40"
+                    />
+                    {errors.height && <p className="text-[11px] text-destructive mt-1">{errors.height}</p>}
+                  </div>
+
+                  {/* Weight (optional) */}
+                  <div className="rounded-lg border border-border/50 bg-[#0d1f35] p-3.5 focus-within:border-primary transition-all">
+                    <div className="flex items-center gap-1.5 mb-0.5">
+                      <label className="text-[13px] font-medium text-foreground">Weight</label>
+                      <span className="text-[10px] text-muted-foreground bg-muted/30 px-1.5 py-0.5 rounded-full">Optional</span>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground mb-2">kg</p>
+                    <input
+                      type="number"
+                      inputMode="numeric"
                       min={40}
                       max={130}
-                      value={form.weight}
-                      onChange={(e) => updateForm({ weight: e.target.value })}
-                      className="text-center text-lg h-12 bg-secondary border-border"
+                      placeholder="e.g. 75"
+                      value={form.weight_kg}
+                      onChange={(e) => updateForm({ weight_kg: e.target.value })}
+                      className="w-full bg-transparent text-foreground text-base outline-none placeholder:text-muted-foreground/40"
                     />
-                    {errors.weight && <p className="text-destructive text-xs mt-1">{errors.weight}</p>}
+                    <p className="text-[11px] text-muted-foreground mt-2">Used only for AI intensity normalisation. Not shown publicly.</p>
                   </div>
                 </div>
                 <Button onClick={handleContinue} className="mt-8 h-12 px-8 text-base">Continue →</Button>
@@ -538,30 +756,70 @@ const Analyze = () => {
               </div>
             )}
 
-            {/* STEP 5 */}
+            {/* STEP 5 — Team, League, Country */}
             {step === 5 && (
               <div>
-                <h1 className="text-3xl sm:text-4xl font-bold text-foreground mb-10">
+                <h1 className="text-3xl sm:text-4xl font-bold text-foreground mb-6">
                   What team and league do you play in?
                 </h1>
+
+                {/* Transfermarkt auto-fill banner */}
+                {form.transfermarkt_data.fetched && (
+                  <div className="flex items-start gap-3 rounded-lg border-l-[3px] border-primary bg-[#0d2a4a] p-3 mb-6 max-w-md mx-auto text-left">
+                    <Sparkles className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                    <p className="text-[12px] text-[#a8c0e0]">Auto-filled from your Transfermarkt profile</p>
+                  </div>
+                )}
+
                 <div className="flex flex-col gap-4 max-w-md mx-auto">
                   <div>
-                    <Input
-                      placeholder="e.g. FC Petrocub, Dacia Buiucani, FC Porto..."
-                      value={form.teamName}
-                      onChange={(e) => updateForm({ teamName: e.target.value })}
-                      className="text-center text-lg h-12 bg-secondary border-border"
-                    />
+                    {form.transfermarkt_data.fetched && form.teamName && (
+                      <span className="text-[10px] text-[#1db954] bg-[#0d3320] px-2 py-0.5 rounded-full mb-1 inline-block">Auto-filled from Transfermarkt</span>
+                    )}
+                    <div className="relative">
+                      <Input
+                        placeholder="e.g. FC Petrocub, Dacia Buiucani, FC Porto..."
+                        value={form.teamName}
+                        onChange={(e) => updateForm({ teamName: e.target.value })}
+                        className="text-center text-lg h-12 bg-secondary border-border"
+                      />
+                      {form.transfermarkt_data.fetched && form.teamName && (
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-[#1db954]" />
+                      )}
+                    </div>
                     {errors.team && <p className="text-destructive text-xs mt-1">{errors.team}</p>}
                   </div>
                   <div>
+                    {form.transfermarkt_data.fetched && form.league && (
+                      <span className="text-[10px] text-[#1db954] bg-[#0d3320] px-2 py-0.5 rounded-full mb-1 inline-block">Auto-filled from Transfermarkt</span>
+                    )}
+                    <div className="relative">
+                      <Input
+                        placeholder="e.g. Divizia Națională, Liga 1, Primeira Liga..."
+                        value={form.league}
+                        onChange={(e) => updateForm({ league: e.target.value })}
+                        className="text-center text-lg h-12 bg-secondary border-border"
+                      />
+                      {form.transfermarkt_data.fetched && form.league && (
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-[#1db954]" />
+                      )}
+                    </div>
+                    {errors.league && <p className="text-destructive text-xs mt-1">{errors.league}</p>}
+                  </div>
+
+                  {/* Country field */}
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <label className="text-[13px] font-medium text-foreground text-left">Country</label>
+                      <span className="text-[10px] text-muted-foreground bg-muted/30 px-1.5 py-0.5 rounded-full">Optional</span>
+                    </div>
                     <Input
-                      placeholder="e.g. Divizia Națională, Liga 1, Primeira Liga..."
-                      value={form.league}
-                      onChange={(e) => updateForm({ league: e.target.value })}
+                      placeholder="e.g. Moldova, Romania, Portugal..."
+                      value={form.country}
+                      onChange={(e) => updateForm({ country: e.target.value })}
                       className="text-center text-lg h-12 bg-secondary border-border"
                     />
-                    {errors.league && <p className="text-destructive text-xs mt-1">{errors.league}</p>}
+                    <p className="text-[11px] text-muted-foreground mt-1 text-left">Helps scouts filter players by country on the leaderboard.</p>
                   </div>
                 </div>
                 <Button onClick={handleContinue} className="mt-8 h-12 px-8 text-base">Continue →</Button>
