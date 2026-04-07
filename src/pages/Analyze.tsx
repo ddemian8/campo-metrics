@@ -170,13 +170,18 @@ const Analyze = () => {
       if (!form.teamName.trim()) e.team = "Required";
       if (!form.league.trim()) e.league = "Required";
     }
-    if (s === 7 && form.entryMethod === "manual") {
-      if (!form.manualData.duration) e.duration = "Required";
-      else if (!/^\d{1,3}:\d{2}$/.test(form.manualData.duration)) e.duration = "Please use mm:ss format (e.g. 08:24)";
-      if (!form.manualData.distance) e.distance = "Required";
-      if (!form.manualData.max_sp) e.max_sp = "Required";
-      if (!form.manualData.sp_ev) e.sp_ev = "Required";
-      if (!form.manualData.hmld) e.hmld = "Required";
+    if (s === 7) {
+      if (form.entryMethod === "manual") {
+        if (!form.manualData.duration) e.duration = "Required";
+        else if (!/^\d{1,3}:\d{2}$/.test(form.manualData.duration)) e.duration = "Please use mm:ss format (e.g. 08:24)";
+        if (!form.manualData.distance) e.distance = "Required";
+        if (!form.manualData.max_sp) e.max_sp = "Required";
+        if (!form.manualData.sp_ev) e.sp_ev = "Required";
+        if (!form.manualData.hmld) e.hmld = "Required";
+      }
+      if (!form.consent.public_profile) e.consent_public_profile = "You must accept this to generate your report and be discoverable on Campometric.";
+      if (!form.consent.leaderboard) e.consent_leaderboard = "Leaderboard participation is required to use the Campometric platform.";
+      if (!form.consent.terms) e.consent_terms = "Please accept the Terms of Service and Privacy Policy to continue.";
     }
     setErrors(e);
     return Object.keys(e).length === 0;
