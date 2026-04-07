@@ -44,6 +44,11 @@ interface FormState {
     hmld: string;
     athlete_name: string;
   };
+  consent: {
+    public_profile: boolean;
+    leaderboard: boolean;
+    terms: boolean;
+  };
 }
 
 const stepVariants = {
@@ -91,7 +96,24 @@ const Analyze = () => {
       hmld: "",
       athlete_name: "",
     },
+    consent: {
+      public_profile: false,
+      leaderboard: false,
+      terms: false,
+    },
   });
+
+  const updateConsent = useCallback((field: keyof FormState['consent'], value: boolean) => {
+    setForm((prev) => ({
+      ...prev,
+      consent: { ...prev.consent, [field]: value },
+    }));
+    setErrors((prev) => {
+      const next = { ...prev };
+      delete next[`consent_${field}`];
+      return next;
+    });
+  }, []);
 
   const updateForm = useCallback((updates: Partial<FormState>) => {
     setForm((prev) => ({ ...prev, ...updates }));
@@ -148,13 +170,18 @@ const Analyze = () => {
       if (!form.teamName.trim()) e.team = "Required";
       if (!form.league.trim()) e.league = "Required";
     }
-    if (s === 7 && form.entryMethod === "manual") {
-      if (!form.manualData.duration) e.duration = "Required";
-      else if (!/^\d{1,3}:\d{2}$/.test(form.manualData.duration)) e.duration = "Please use mm:ss format (e.g. 08:24)";
-      if (!form.manualData.distance) e.distance = "Required";
-      if (!form.manualData.max_sp) e.max_sp = "Required";
-      if (!form.manualData.sp_ev) e.sp_ev = "Required";
-      if (!form.manualData.hmld) e.hmld = "Required";
+    if (s === 7) {
+      if (form.entryMethod === "manual") {
+        if (!form.manualData.duration) e.duration = "Required";
+        else if (!/^\d{1,3}:\d{2}$/.test(form.manualData.duration)) e.duration = "Please use mm:ss format (e.g. 08:24)";
+        if (!form.manualData.distance) e.distance = "Required";
+        if (!form.manualData.max_sp) e.max_sp = "Required";
+        if (!form.manualData.sp_ev) e.sp_ev = "Required";
+        if (!form.manualData.hmld) e.hmld = "Required";
+      }
+      if (!form.consent.public_profile) e.consent_public_profile = "You must accept this to generate your report and be discoverable on Campometric.";
+      if (!form.consent.leaderboard) e.consent_leaderboard = "Leaderboard participation is required to use the Campometric platform.";
+      if (!form.consent.terms) e.consent_terms = "Please accept the Terms of Service and Privacy Policy to continue.";
     }
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -168,6 +195,106 @@ const Analyze = () => {
     if (!validateStep(7)) return;
     setIsLoading(true);
   };
+
+  const consentCheckboxes = [
+    {
+      id: "public_profile" as const,
+      label: "I agree to make my performance data visible to Agents, Clubs and Scouts on the Campometric platform.",
+      description: "Your name, position, team and GPS metrics will be visible to verified scouts and agents searching the Campometric database.",
+      errorKey: "consent_public_profile",
+    },
+    {
+      id: "leaderboard" as const,
+      label: "I agree to appear on the public Campometric Leaderboard ranked by physical performance metrics.",
+      description: "Your name, position, league and key metrics (distance, max speed, sprints) will appear on the public leaderboard visible to anyone visiting campometric.com.",
+      errorKey: "consent_leaderboard",
+    },
+    {
+      id: "terms" as const,
+      label: "__terms__",
+      description: "You must be at least 16 years old to use Campometric. If you are under 18, please ensure you have parental consent.",
+      errorKey: "consent_terms",
+    },
+  ];
+
+  const renderConsentSection = () => (
+    <div className="max-w-2xl mx-auto mt-8 text-left">
+      {/* Divider */}
+      <div className="h-px bg-muted-foreground/20 mb-6" />
+
+      {/* Section title */}
+      <p className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground font-medium mb-4">
+        Data Visibility & Consent
+      </p>
+
+      {/* Info banner */}
+      <div className="flex items-start gap-3 rounded-lg border-l-[3px] border-primary bg-[#0d2a4a] p-3 mb-5">
+        <Shield className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+        <p className="text-[11px] text-[#a8c0e0] leading-relaxed">
+          Your data is protected. Campometric stores your information securely and never sells your personal data to third parties. You can withdraw consent and delete your data at any time from your account settings.
+        </p>
+      </div>
+
+      {/* Checkboxes */}
+      <div className="space-y-3.5">
+        {consentCheckboxes.map((cb) => (
+          <div key={cb.id}>
+            <button
+              type="button"
+              onClick={() => updateConsent(cb.id, !form.consent[cb.id])}
+              className="flex items-start gap-3 w-full text-left group"
+            >
+              <div
+                className={cn(
+                  "mt-0.5 h-[18px] w-[18px] shrink-0 rounded border flex items-center justify-center transition-all",
+                  form.consent[cb.id]
+                    ? "bg-primary border-primary"
+                    : errors[cb.errorKey]
+                      ? "border-destructive bg-transparent"
+                      : "border-[#2a3a52] bg-transparent"
+                )}
+              >
+                {form.consent[cb.id] && <Check className="h-3 w-3 text-primary-foreground" />}
+              </div>
+              <div className="flex-1">
+                {cb.id === "terms" ? (
+                  <p className="text-[13px] text-foreground leading-relaxed">
+                    I have read and agree to the Campometric{" "}
+                    <a
+                      href="/terms"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-primary underline-offset-2 hover:underline"
+                    >
+                      Terms of Service
+                    </a>{" "}
+                    and{" "}
+                    <a
+                      href="/privacy"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-primary underline-offset-2 hover:underline"
+                    >
+                      Privacy Policy
+                    </a>
+                    .
+                  </p>
+                ) : (
+                  <p className="text-[13px] text-foreground leading-relaxed">{cb.label}</p>
+                )}
+                <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">{cb.description}</p>
+              </div>
+            </button>
+            {errors[cb.errorKey] && (
+              <p className="text-[11px] text-destructive mt-1 ml-[30px]">{errors[cb.errorKey]}</p>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") {
@@ -614,20 +741,31 @@ const Analyze = () => {
                       ))}
                     </div>
 
+                    {renderConsentSection()}
+
                     {(() => {
                       const m = form.manualData;
                       const allRequiredFilled = m.duration && m.distance && m.max_sp && m.sp_ev && m.hmld;
+                      const allConsent = form.consent.public_profile && form.consent.leaderboard && form.consent.terms;
+                      const canSubmit = allRequiredFilled && allConsent;
                       return (
-                        <Button
-                          onClick={handleSubmit}
-                          disabled={!allRequiredFilled}
-                          className={cn(
-                            "mt-8 h-12 px-8 text-base w-full max-w-2xl",
-                            !allRequiredFilled && "opacity-50 cursor-not-allowed"
+                        <>
+                          <Button
+                            onClick={handleSubmit}
+                            disabled={!canSubmit}
+                            className={cn(
+                              "mt-6 h-12 px-8 text-base w-full max-w-2xl",
+                              !canSubmit && "opacity-50 cursor-not-allowed"
+                            )}
+                          >
+                            Generate my report →
+                          </Button>
+                          {!canSubmit && (
+                            <p className="text-[11px] text-muted-foreground mt-2 text-center">
+                              Complete all required fields and accept the consents above to continue.
+                            </p>
                           )}
-                        >
-                          Generate my report →
-                        </Button>
+                        </>
                       );
                     })()}
                   </>
@@ -674,13 +812,31 @@ const Analyze = () => {
                         </div>
                       )}
                     </div>
-                    <Button
-                      onClick={handleSubmit}
-                      disabled={!form.gpsFile}
-                      className="mt-8 h-12 px-8 text-base"
-                    >
-                      Analyse my session →
-                    </Button>
+                    {renderConsentSection()}
+
+                    {(() => {
+                      const allConsent = form.consent.public_profile && form.consent.leaderboard && form.consent.terms;
+                      const canSubmit = form.gpsFile && allConsent;
+                      return (
+                        <>
+                          <Button
+                            onClick={handleSubmit}
+                            disabled={!canSubmit}
+                            className={cn(
+                              "mt-6 h-12 px-8 text-base",
+                              !canSubmit && "opacity-50 cursor-not-allowed"
+                            )}
+                          >
+                            Analyse my session →
+                          </Button>
+                          {!canSubmit && (
+                            <p className="text-[11px] text-muted-foreground mt-2 text-center">
+                              Complete all required fields and accept the consents above to continue.
+                            </p>
+                          )}
+                        </>
+                      );
+                    })()}
                   </>
                 )}
               </div>
