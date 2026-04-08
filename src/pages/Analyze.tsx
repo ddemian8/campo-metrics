@@ -1,21 +1,19 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Upload, Image, Keyboard, Shield, Crosshair, Swords, Goal, ChevronLeft, Check, Loader2, FileText, Calendar as CalendarIcon, Info, AlertTriangle, Sparkles } from "lucide-react";
+import { Upload, Image, Keyboard, Shield, Crosshair, Swords, Goal, ChevronLeft, Check, Loader2, FileText, Info, AlertTriangle, Sparkles, HelpCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { format, differenceInYears, subYears } from "date-fns";
+import { format, differenceInYears } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 
 type EntryMethod = "pdf" | "screenshot" | "manual";
 type Position = "GK" | "DEF" | "MID" | "FWD";
 type SessionType = "match" | "training";
-type MDDay = "MD-2" | "MD-1" | "MD0" | "MD+1" | "MD+2" | "other";
+type MDDay = "MD-3" | "MD-2" | "MD-1" | "MD0" | "MD+1" | "MD+2" | "MD+3";
 
 interface TransfermarktData {
   club: string | null;
@@ -27,12 +25,14 @@ interface TransfermarktData {
 
 interface FormState {
   entryMethod: EntryMethod | null;
-  firstName: string;
-  lastName: string;
+  fullName: string;
   transfermarkt_url: string;
   transfermarkt_data: TransfermarktData;
   transfermarkt_status: "idle" | "loading" | "success" | "error";
-  date_of_birth: Date | undefined;
+  dob_day: string;
+  dob_month: string;
+  dob_year: string;
+  date_of_birth: string; // YYYY-MM-DD
   age_calculated: number | null;
   height_cm: string;
   weight_kg: string;
@@ -43,7 +43,10 @@ interface FormState {
   sessionType: SessionType | null;
   mdDay: MDDay;
   opponent: string;
-  sessionDate: Date;
+  session_day: string;
+  session_month: string;
+  session_year: string;
+  sessionDate: string; // YYYY-MM-DD
   gpsFile: File | null;
   manualData: {
     duration: string;
@@ -74,6 +77,28 @@ const stepVariants = {
 
 const STEP_PROGRESS = [14, 28, 42, 57, 71, 85, 100];
 
+const MONTHS = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+const now = new Date();
+const currentYear = now.getFullYear();
+
+function getDaysInMonth(month: number, year: number): number {
+  if (!month || !year) return 31;
+  return new Date(year, month, 0).getDate();
+}
+
+function isValidTransfermarkt(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return parsed.hostname.includes("transfermarkt");
+  } catch {
+    return false;
+  }
+}
+
 const Analyze = () => {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
@@ -83,14 +108,20 @@ const Analyze = () => {
   const nameRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
 
+  const todayDay = String(now.getDate()).padStart(2, "0");
+  const todayMonth = String(now.getMonth() + 1);
+  const todayYear = String(currentYear);
+
   const [form, setForm] = useState<FormState>({
     entryMethod: null,
-    firstName: "",
-    lastName: "",
+    fullName: "",
     transfermarkt_url: "",
     transfermarkt_data: { club: null, league: null, nationality: null, market_value: null, fetched: false },
     transfermarkt_status: "idle",
-    date_of_birth: undefined,
+    dob_day: "",
+    dob_month: "",
+    dob_year: "",
+    date_of_birth: "",
     age_calculated: null,
     height_cm: "",
     weight_kg: "",
@@ -101,7 +132,10 @@ const Analyze = () => {
     sessionType: null,
     mdDay: "MD0",
     opponent: "",
-    sessionDate: new Date(),
+    session_day: todayDay,
+    session_month: todayMonth,
+    session_year: todayYear,
+    sessionDate: format(now, "yyyy-MM-dd"),
     gpsFile: null,
     manualData: {
       duration: "",
@@ -177,16 +211,36 @@ const Analyze = () => {
     return () => timers.forEach(clearTimeout);
   }, [isLoading, navigate]);
 
-  // Calculate age when DOB changes
+  // Calculate DOB and age when dropdowns change
   useEffect(() => {
-    if (form.date_of_birth) {
-      const age = differenceInYears(new Date(), form.date_of_birth);
-      setForm(prev => ({ ...prev, age_calculated: age }));
+    const { dob_day, dob_month, dob_year } = form;
+    if (dob_day && dob_month && dob_year) {
+      const y = parseInt(dob_year);
+      const m = parseInt(dob_month);
+      const d = parseInt(dob_day);
+      const maxD = getDaysInMonth(m, y);
+      if (d > maxD) {
+        setErrors(prev => ({ ...prev, dob: "This date doesn't exist — please check the day" }));
+        return;
+      }
+      const dateStr = `${dob_year}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+      const dateObj = new Date(y, m - 1, d);
+      const age = differenceInYears(new Date(), dateObj);
+      setForm(prev => ({ ...prev, date_of_birth: dateStr, age_calculated: age }));
     }
-  }, [form.date_of_birth]);
+  }, [form.dob_day, form.dob_month, form.dob_year]);
+
+  // Calculate session date from dropdowns
+  useEffect(() => {
+    const { session_day, session_month, session_year } = form;
+    if (session_day && session_month && session_year) {
+      const dateStr = `${session_year}-${String(parseInt(session_month)).padStart(2, "0")}-${String(parseInt(session_day)).padStart(2, "0")}`;
+      setForm(prev => ({ ...prev, sessionDate: dateStr }));
+    }
+  }, [form.session_day, form.session_month, form.session_year]);
 
   const fetchTransfermarkt = useCallback(async (url: string) => {
-    if (!url || !url.includes('transfermarkt.com')) return;
+    if (!url || !isValidTransfermarkt(url)) return;
 
     setForm(prev => ({ ...prev, transfermarkt_status: "loading" }));
 
@@ -222,18 +276,35 @@ const Analyze = () => {
     }
   }, []);
 
+  const splitName = (fullName: string) => {
+    const parts = fullName.trim().split(/\s+/);
+    const firstName = parts[0] || "";
+    const lastName = parts.slice(1).join(" ") || "";
+    return { firstName, lastName };
+  };
+
   const validateStep = (s: number): boolean => {
     const e: Record<string, string> = {};
     if (s === 2) {
-      if (!form.firstName.trim() || !form.lastName.trim())
-        e.name = "Please enter your full name";
-      if (form.transfermarkt_url && !form.transfermarkt_url.includes('transfermarkt.com'))
-        e.transfermarkt = "Please paste a valid Transfermarkt profile URL (transfermarkt.com)";
+      if (!form.fullName.trim()) e.name = "Please enter your full name";
+      else if (form.fullName.trim().split(/\s+/).length < 2) e.name = "Please enter both your first and last name";
+      else if (!/^[\p{L}\s'-]+$/u.test(form.fullName.trim())) e.name = "Name can only contain letters";
+      if (form.transfermarkt_url && !isValidTransfermarkt(form.transfermarkt_url))
+        e.transfermarkt = "Please paste a valid Transfermarkt profile link (any country domain is accepted)";
     }
     if (s === 3) {
-      if (!form.date_of_birth) e.dob = "Required";
-      else if (form.age_calculated !== null && form.age_calculated < 14)
-        e.dob = "You must be at least 14 years old to use Campometric.";
+      if (!form.dob_day || !form.dob_month || !form.dob_year) e.dob = "Required";
+      else {
+        const m = parseInt(form.dob_month);
+        const d = parseInt(form.dob_day);
+        const y = parseInt(form.dob_year);
+        const maxD = getDaysInMonth(m, y);
+        if (d > maxD) e.dob = "This date doesn't exist — please check the day";
+        else if (form.age_calculated !== null) {
+          if (form.age_calculated < 14) e.dob = "You must be at least 14 years old to use Campometric";
+          else if (form.age_calculated > 50) e.dob = "Please check your date of birth";
+        }
+      }
       if (!form.height_cm) e.height = "Required";
       else {
         const h = parseInt(form.height_cm);
@@ -243,6 +314,11 @@ const Analyze = () => {
     if (s === 5) {
       if (!form.teamName.trim()) e.team = "Required";
       if (!form.league.trim()) e.league = "Required";
+    }
+    if (s === 6) {
+      if (!form.sessionType) e.sessionType = "Required";
+      if (form.sessionType === "training" && form.mdDay === "MD0") e.mdDay = "Please select an MD day";
+      if (!form.session_day || !form.session_month || !form.session_year) e.sessionDate = "Required";
     }
     if (s === 7) {
       if (form.entryMethod === "manual") {
@@ -271,13 +347,13 @@ const Analyze = () => {
 
     try {
       const sessionId = crypto.randomUUID();
+      const { firstName, lastName } = splitName(form.fullName);
 
-      // Insert into sessions table
       await supabase.from('sessions').insert({
         id: sessionId,
-        first_name: form.firstName,
-        last_name: form.lastName,
-        date_of_birth: form.date_of_birth ? format(form.date_of_birth, 'yyyy-MM-dd') : null,
+        first_name: firstName,
+        last_name: lastName,
+        date_of_birth: form.date_of_birth || null,
         age_calculated: form.age_calculated,
         height_cm: form.height_cm ? parseInt(form.height_cm) : null,
         weight_kg: form.weight_kg ? parseInt(form.weight_kg) : null,
@@ -291,7 +367,7 @@ const Analyze = () => {
         session_type: form.sessionType,
         md_day: form.mdDay,
         opponent: form.opponent || null,
-        session_date: format(form.sessionDate, 'yyyy-MM-dd'),
+        session_date: form.sessionDate || null,
         entry_method: form.entryMethod,
         duration: form.manualData.duration || null,
         distance: form.manualData.distance ? parseFloat(form.manualData.distance) : null,
@@ -312,11 +388,10 @@ const Analyze = () => {
         status: 'processing',
       } as any);
 
-      // Insert into players table
       await supabase.from('players').insert({
-        first_name: form.firstName,
-        last_name: form.lastName,
-        date_of_birth: form.date_of_birth ? format(form.date_of_birth, 'yyyy-MM-dd') : null,
+        first_name: firstName,
+        last_name: lastName,
+        date_of_birth: form.date_of_birth || null,
         age_calculated: form.age_calculated,
         height_cm: form.height_cm ? parseInt(form.height_cm) : null,
         weight_kg: form.weight_kg ? parseInt(form.weight_kg) : null,
@@ -328,8 +403,6 @@ const Analyze = () => {
         transfermarkt_club: form.transfermarkt_data.club,
         transfermarkt_league: form.transfermarkt_data.league,
       } as any);
-
-      // Navigate happens via loading effect
     } catch (err) {
       console.error('Error saving session:', err);
     }
@@ -431,6 +504,70 @@ const Analyze = () => {
     if (file) updateForm({ gpsFile: file });
   };
 
+  // Render 3-part date picker
+  const renderDateDropdowns = (
+    dayKey: "dob_day" | "session_day",
+    monthKey: "dob_month" | "session_month",
+    yearKey: "dob_year" | "session_year",
+    yearRange: [number, number],
+    label: string,
+    hint?: string
+  ) => {
+    const dayVal = form[dayKey];
+    const monthVal = form[monthKey];
+    const yearVal = form[yearKey];
+
+    const maxDays = getDaysInMonth(
+      monthVal ? parseInt(monthVal) : 0,
+      yearVal ? parseInt(yearVal) : currentYear
+    );
+
+    return (
+      <div>
+        <label className="text-[13px] font-medium text-foreground block mb-1.5">{label}</label>
+        <div className="grid grid-cols-3 gap-2">
+          <Select value={dayVal} onValueChange={(v) => updateForm({ [dayKey]: v } as any)}>
+            <SelectTrigger className="h-11 bg-[#0d1f35] border-border text-foreground">
+              <SelectValue placeholder="Day" />
+            </SelectTrigger>
+            <SelectContent>
+              {Array.from({ length: maxDays }, (_, i) => i + 1).map((d) => (
+                <SelectItem key={d} value={String(d).padStart(2, "0")}>
+                  {String(d).padStart(2, "0")}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={monthVal} onValueChange={(v) => updateForm({ [monthKey]: v } as any)}>
+            <SelectTrigger className="h-11 bg-[#0d1f35] border-border text-foreground">
+              <SelectValue placeholder="Month" />
+            </SelectTrigger>
+            <SelectContent>
+              {MONTHS.map((m, i) => (
+                <SelectItem key={i} value={String(i + 1)}>
+                  {m}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={yearVal} onValueChange={(v) => updateForm({ [yearKey]: v } as any)}>
+            <SelectTrigger className="h-11 bg-[#0d1f35] border-border text-foreground">
+              <SelectValue placeholder="Year" />
+            </SelectTrigger>
+            <SelectContent>
+              {Array.from({ length: yearRange[1] - yearRange[0] + 1 }, (_, i) => yearRange[1] - i).map((y) => (
+                <SelectItem key={y} value={String(y)}>
+                  {y}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        {hint && <p className="text-[11px] text-muted-foreground mt-1.5">{hint}</p>}
+      </div>
+    );
+  };
+
   // Loading screen
   if (isLoading) {
     const lines = [
@@ -463,11 +600,11 @@ const Analyze = () => {
                 animate={{ opacity: 1, y: 0 }}
                 className={cn(
                   "flex items-center gap-3 text-base",
-                  isLast && isDone ? "text-success font-bold" : isDone ? "text-muted-foreground" : "text-foreground"
+                  isLast && isDone ? "text-[#1db954] font-bold" : isDone ? "text-muted-foreground" : "text-foreground"
                 )}
               >
                 {isDone ? (
-                  <Check className="h-5 w-5 text-success shrink-0" />
+                  <Check className="h-5 w-5 text-[#1db954] shrink-0" />
                 ) : isActive ? (
                   <Loader2 className="h-5 w-5 text-primary animate-spin shrink-0" />
                 ) : null}
@@ -488,8 +625,14 @@ const Analyze = () => {
     );
   }
 
-  const maxDob = subYears(new Date(), 14);
-  const minDob = subYears(new Date(), 50);
+  const mdPills: { value: MDDay; label: string }[] = [
+    { value: "MD-3", label: "MD-3" },
+    { value: "MD-2", label: "MD-2" },
+    { value: "MD-1", label: "MD-1" },
+    { value: "MD+1", label: "MD+1" },
+    { value: "MD+2", label: "MD+2" },
+    { value: "MD+3", label: "MD+3" },
+  ];
 
   return (
     <div className="min-h-screen bg-background flex flex-col" onKeyDown={handleKeyDown}>
@@ -566,18 +709,13 @@ const Analyze = () => {
             {step === 2 && (
               <div>
                 <h1 className="text-3xl sm:text-4xl font-bold text-foreground mb-10">What's your name?</h1>
-                <div className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto">
+                <div className="max-w-md mx-auto">
                   <Input
                     ref={nameRef}
-                    placeholder="First name"
-                    value={form.firstName}
-                    onChange={(e) => updateForm({ firstName: e.target.value })}
-                    className="text-center text-lg h-12 bg-secondary border-border"
-                  />
-                  <Input
-                    placeholder="Last name"
-                    value={form.lastName}
-                    onChange={(e) => updateForm({ lastName: e.target.value })}
+                    placeholder="e.g. Alexandru Popescu"
+                    value={form.fullName}
+                    onChange={(e) => updateForm({ fullName: e.target.value })}
+                    maxLength={60}
                     className="text-center text-lg h-12 bg-secondary border-border"
                   />
                 </div>
@@ -595,14 +733,14 @@ const Analyze = () => {
                     value={form.transfermarkt_url}
                     onChange={(e) => updateForm({ transfermarkt_url: e.target.value })}
                     onBlur={() => {
-                      if (form.transfermarkt_url && form.transfermarkt_url.includes('transfermarkt.com')) {
+                      if (form.transfermarkt_url && isValidTransfermarkt(form.transfermarkt_url)) {
                         fetchTransfermarkt(form.transfermarkt_url);
                       }
                     }}
                     className="text-sm h-11 bg-secondary border-border"
                   />
                   <p className="text-[11px] text-muted-foreground mt-1.5">
-                    If you have a Transfermarkt profile, paste the link here. We'll automatically fill in your team and league.
+                    Works with all Transfermarkt domains: .com, .de, .it, .ro, .es, .fr, .co.uk and more
                   </p>
                   {errors.transfermarkt && <p className="text-[11px] text-destructive mt-1">{errors.transfermarkt}</p>}
 
@@ -633,89 +771,68 @@ const Analyze = () => {
               </div>
             )}
 
-            {/* STEP 3 — DOB, Height, Weight */}
+            {/* STEP 3 — DOB (3 dropdowns), Height, Weight */}
             {step === 3 && (
               <div>
                 <h1 className="text-3xl sm:text-4xl font-bold text-foreground mb-10">
                   Tell us a bit more about you
                 </h1>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-xl mx-auto text-left">
-                  {/* Date of Birth */}
-                  <div className="rounded-lg border border-border/50 bg-[#0d1f35] p-3.5 focus-within:border-primary transition-all">
-                    <div className="flex items-center gap-1.5 mb-0.5">
-                      <label className="text-[13px] font-medium text-foreground">Date of birth</label>
-                      <span className="text-red-500 text-xs">•</span>
-                    </div>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          className={cn(
-                            "w-full justify-start text-left font-normal h-10 px-0 hover:bg-transparent",
-                            !form.date_of_birth && "text-muted-foreground/40"
-                          )}
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {form.date_of_birth ? format(form.date_of_birth, "dd / MM / yyyy") : "DD / MM / YYYY"}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={form.date_of_birth}
-                          onSelect={(d) => d && updateForm({ date_of_birth: d })}
-                          disabled={(date) => date > maxDob || date < minDob}
-                          defaultMonth={maxDob}
-                          className="p-3 pointer-events-auto"
-                        />
-                      </PopoverContent>
-                    </Popover>
-                    {form.date_of_birth && form.age_calculated !== null && (
-                      <p className="text-[13px] text-[#1db954] font-bold mt-1">
+                <div className="max-w-xl mx-auto space-y-5 text-left">
+                  {/* DOB dropdowns */}
+                  <div className="rounded-lg border border-border/50 bg-[#0d1f35] p-4">
+                    {renderDateDropdowns(
+                      "dob_day", "dob_month", "dob_year",
+                      [currentYear - 50, currentYear - 14],
+                      "Date of birth",
+                      "Used to calculate your age for position benchmarks"
+                    )}
+                    {form.dob_day && form.dob_month && form.dob_year && form.age_calculated !== null && form.age_calculated >= 14 && form.age_calculated <= 50 && (
+                      <p className="text-[13px] text-[#1db954] font-medium mt-2">
                         Age: {form.age_calculated} years old
                       </p>
                     )}
                     {errors.dob && <p className="text-[11px] text-destructive mt-1">{errors.dob}</p>}
                   </div>
 
-                  {/* Height */}
-                  <div className="rounded-lg border border-border/50 bg-[#0d1f35] p-3.5 focus-within:border-primary transition-all">
-                    <div className="flex items-center gap-1.5 mb-0.5">
-                      <label className="text-[13px] font-medium text-foreground">Height</label>
-                      <span className="text-red-500 text-xs">•</span>
+                  {/* Height + Weight row */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="rounded-lg border border-border/50 bg-[#0d1f35] p-3.5 focus-within:border-primary transition-all">
+                      <div className="flex items-center gap-1.5 mb-0.5">
+                        <label className="text-[13px] font-medium text-foreground">Height</label>
+                        <span className="text-red-500 text-xs">•</span>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground mb-2">cm</p>
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        min={140}
+                        max={220}
+                        placeholder="e.g. 181"
+                        value={form.height_cm}
+                        onChange={(e) => updateForm({ height_cm: e.target.value })}
+                        className="w-full bg-transparent text-foreground text-base outline-none placeholder:text-muted-foreground/40"
+                      />
+                      {errors.height && <p className="text-[11px] text-destructive mt-1">{errors.height}</p>}
                     </div>
-                    <p className="text-[11px] text-muted-foreground mb-2">cm</p>
-                    <input
-                      type="number"
-                      inputMode="numeric"
-                      min={140}
-                      max={220}
-                      placeholder="e.g. 181"
-                      value={form.height_cm}
-                      onChange={(e) => updateForm({ height_cm: e.target.value })}
-                      className="w-full bg-transparent text-foreground text-base outline-none placeholder:text-muted-foreground/40"
-                    />
-                    {errors.height && <p className="text-[11px] text-destructive mt-1">{errors.height}</p>}
-                  </div>
 
-                  {/* Weight (optional) */}
-                  <div className="rounded-lg border border-border/50 bg-[#0d1f35] p-3.5 focus-within:border-primary transition-all">
-                    <div className="flex items-center gap-1.5 mb-0.5">
-                      <label className="text-[13px] font-medium text-foreground">Weight</label>
-                      <span className="text-[10px] text-muted-foreground bg-muted/30 px-1.5 py-0.5 rounded-full">Optional</span>
+                    <div className="rounded-lg border border-border/50 bg-[#0d1f35] p-3.5 focus-within:border-primary transition-all">
+                      <div className="flex items-center gap-1.5 mb-0.5">
+                        <label className="text-[13px] font-medium text-foreground">Weight</label>
+                        <span className="text-[10px] text-muted-foreground bg-muted/30 px-1.5 py-0.5 rounded-full">Optional</span>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground mb-2">kg</p>
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        min={40}
+                        max={130}
+                        placeholder="e.g. 75"
+                        value={form.weight_kg}
+                        onChange={(e) => updateForm({ weight_kg: e.target.value })}
+                        className="w-full bg-transparent text-foreground text-base outline-none placeholder:text-muted-foreground/40"
+                      />
+                      <p className="text-[11px] text-muted-foreground mt-2">Used only for AI intensity normalisation. Not shown publicly.</p>
                     </div>
-                    <p className="text-[11px] text-muted-foreground mb-2">kg</p>
-                    <input
-                      type="number"
-                      inputMode="numeric"
-                      min={40}
-                      max={130}
-                      placeholder="e.g. 75"
-                      value={form.weight_kg}
-                      onChange={(e) => updateForm({ weight_kg: e.target.value })}
-                      className="w-full bg-transparent text-foreground text-base outline-none placeholder:text-muted-foreground/40"
-                    />
-                    <p className="text-[11px] text-muted-foreground mt-2">Used only for AI intensity normalisation. Not shown publicly.</p>
                   </div>
                 </div>
                 <Button onClick={handleContinue} className="mt-8 h-12 px-8 text-base">Continue →</Button>
@@ -763,7 +880,6 @@ const Analyze = () => {
                   What team and league do you play in?
                 </h1>
 
-                {/* Transfermarkt auto-fill banner */}
                 {form.transfermarkt_data.fetched && (
                   <div className="flex items-start gap-3 rounded-lg border-l-[3px] border-primary bg-[#0d2a4a] p-3 mb-6 max-w-md mx-auto text-left">
                     <Sparkles className="h-4 w-4 text-primary shrink-0 mt-0.5" />
@@ -807,7 +923,6 @@ const Analyze = () => {
                     {errors.league && <p className="text-destructive text-xs mt-1">{errors.league}</p>}
                   </div>
 
-                  {/* Country field */}
                   <div>
                     <div className="flex items-center gap-2 mb-1">
                       <label className="text-[13px] font-medium text-foreground text-left">Country</label>
@@ -826,7 +941,7 @@ const Analyze = () => {
               </div>
             )}
 
-            {/* STEP 6 */}
+            {/* STEP 6 — Session type with Match/Training logic */}
             {step === 6 && (
               <div>
                 <h1 className="text-3xl sm:text-4xl font-bold text-foreground mb-10">
@@ -834,19 +949,26 @@ const Analyze = () => {
                 </h1>
                 <div className="flex gap-4 justify-center mb-6">
                   {([
-                    { id: "match" as SessionType, label: "Match", icon: "⚽" },
-                    { id: "training" as SessionType, label: "Training", icon: "🏋️" },
+                    { id: "match" as SessionType, icon: "⚽", title: "Match", sub: "Official or friendly game" },
+                    { id: "training" as SessionType, icon: "🏋️", title: "Training", sub: "Practice session" },
                   ]).map((s) => (
                     <button
                       key={s.id}
-                      onClick={() => updateForm({ sessionType: s.id })}
+                      onClick={() => {
+                        if (s.id === "match") {
+                          updateForm({ sessionType: s.id, mdDay: "MD0" });
+                        } else {
+                          updateForm({ sessionType: s.id, mdDay: "MD0" }); // reset, user must pick
+                        }
+                      }}
                       className={cn(
-                        "flex flex-col items-center gap-3 p-6 px-10 rounded-xl border-2 transition-all hover:border-primary hover:bg-primary/5",
+                        "flex flex-col items-center gap-2 p-6 px-8 rounded-xl border-2 transition-all hover:border-primary hover:bg-primary/5 min-w-[140px]",
                         form.sessionType === s.id ? "border-primary bg-primary/5" : "border-border"
                       )}
                     >
                       <span className="text-3xl">{s.icon}</span>
-                      <span className="font-semibold text-foreground">{s.label}</span>
+                      <span className="font-semibold text-foreground">{s.title}</span>
+                      <span className="text-xs text-muted-foreground">{s.sub}</span>
                     </button>
                   ))}
                 </div>
@@ -857,73 +979,80 @@ const Analyze = () => {
                       initial={{ opacity: 0, height: 0 }}
                       animate={{ opacity: 1, height: "auto" }}
                       exit={{ opacity: 0, height: 0 }}
+                      transition={{ duration: 0.25 }}
                       className="overflow-hidden"
                     >
                       {form.sessionType === "match" && (
-                        <div className="space-y-4 max-w-md mx-auto mt-4">
+                        <div className="space-y-4 max-w-md mx-auto mt-4 text-left">
+                          {renderDateDropdowns(
+                            "session_day", "session_month", "session_year",
+                            [currentYear - 2, currentYear],
+                            "When was the match?"
+                          )}
                           <div>
-                            <p className="text-sm text-muted-foreground mb-2">When was the match?</p>
+                            <label className="text-[13px] font-medium text-foreground block mb-1.5">Opponent (optional)</label>
+                            <Input
+                              placeholder="e.g. FC Milsami"
+                              value={form.opponent}
+                              onChange={(e) => updateForm({ opponent: e.target.value })}
+                              className="h-11 bg-[#0d1f35] border-border"
+                            />
+                          </div>
+                          {errors.sessionDate && <p className="text-[11px] text-destructive">{errors.sessionDate}</p>}
+                        </div>
+                      )}
+
+                      {form.sessionType === "training" && (
+                        <div className="space-y-5 max-w-lg mx-auto mt-4 text-left">
+                          {/* MD day selector */}
+                          <div>
+                            <label className="text-[13px] font-medium text-foreground block mb-2">What type of training session was this?</label>
                             <div className="flex flex-wrap gap-2 justify-center">
-                              {(["MD-2", "MD-1", "MD0", "MD+1", "MD+2", "other"] as MDDay[]).map((md) => (
+                              {mdPills.map((md) => (
                                 <button
-                                  key={md}
-                                  onClick={() => updateForm({ mdDay: md })}
+                                  key={md.value}
+                                  onClick={() => updateForm({ mdDay: md.value })}
                                   className={cn(
                                     "px-4 py-2 rounded-full text-sm font-medium border transition-all",
-                                    form.mdDay === md
+                                    form.mdDay === md.value
                                       ? "bg-primary text-primary-foreground border-primary"
                                       : "border-border text-muted-foreground hover:border-primary hover:text-foreground"
                                   )}
                                 >
-                                  {md}
+                                  {md.label}
                                 </button>
                               ))}
                             </div>
+                            {errors.mdDay && <p className="text-[11px] text-destructive mt-1 text-center">{errors.mdDay}</p>}
                           </div>
-                          <Input
-                            placeholder="Opponent (optional) e.g. FC Milsami"
-                            value={form.opponent}
-                            onChange={(e) => updateForm({ opponent: e.target.value })}
-                            className="text-center h-12 bg-secondary border-border"
-                          />
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <Button variant="outline" className="w-full h-12 justify-center gap-2 bg-secondary border-border">
-                                <CalendarIcon className="h-4 w-4" />
-                                {format(form.sessionDate, "PPP")}
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="center">
-                              <Calendar
-                                mode="single"
-                                selected={form.sessionDate}
-                                onSelect={(d) => d && updateForm({ sessionDate: d })}
-                                className="p-3 pointer-events-auto"
-                              />
-                            </PopoverContent>
-                          </Popover>
+
+                          {/* MD explanation */}
+                          <div className="relative rounded-lg border-l-[3px] border-primary bg-[#0d2a4a] p-4">
+                            <HelpCircle className="absolute top-3 right-3 h-4 w-4 text-muted-foreground/40" />
+                            <p className="text-[12px] font-semibold text-foreground mb-2">What is MD (Match Day)?</p>
+                            <div className="text-[11px] text-[#a8c0e0] leading-[1.8] space-y-0.5">
+                              <p>MD stands for "Match Day" — the day of the official match. Training sessions are classified by how many days before or after the match they take place:</p>
+                              <ul className="mt-2 space-y-0.5">
+                                <li><span className="font-bold text-[#7eb8f7]">MD-3</span> — 3 days before the match → high intensity, tactical work</li>
+                                <li><span className="font-bold text-[#7eb8f7]">MD-2</span> — 2 days before the match → moderate intensity, shape work</li>
+                                <li><span className="font-bold text-[#7eb8f7]">MD-1</span> — 1 day before the match → light session, activation only</li>
+                                <li><span className="font-bold text-[#7eb8f7]">MD+1</span> — 1 day after the match → recovery session, very low load</li>
+                                <li><span className="font-bold text-[#7eb8f7]">MD+2</span> — 2 days after the match → return to training, medium load</li>
+                                <li><span className="font-bold text-[#7eb8f7]">MD+3</span> — 3 days after the match → normal training, full intensity</li>
+                              </ul>
+                            </div>
+                          </div>
+
+                          {/* Session date */}
+                          {renderDateDropdowns(
+                            "session_day", "session_month", "session_year",
+                            [currentYear - 1, currentYear],
+                            "Date of this session"
+                          )}
+                          {errors.sessionDate && <p className="text-[11px] text-destructive">{errors.sessionDate}</p>}
                         </div>
                       )}
-                      {form.sessionType === "training" && (
-                        <div className="space-y-4 max-w-md mx-auto mt-4">
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <Button variant="outline" className="w-full h-12 justify-center gap-2 bg-secondary border-border">
-                                <CalendarIcon className="h-4 w-4" />
-                                {format(form.sessionDate, "PPP")}
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="center">
-                              <Calendar
-                                mode="single"
-                                selected={form.sessionDate}
-                                onSelect={(d) => d && updateForm({ sessionDate: d })}
-                                className="p-3 pointer-events-auto"
-                              />
-                            </PopoverContent>
-                          </Popover>
-                        </div>
-                      )}
+
                       <Button onClick={handleContinue} className="mt-6 h-12 px-8 text-base">Continue →</Button>
                     </motion.div>
                   )}
@@ -934,7 +1063,6 @@ const Analyze = () => {
             {/* STEP 7 */}
             {step === 7 && (
               <div>
-                {/* Logo */}
                 <div className="mb-8">
                   <span className="text-2xl font-bold tracking-tight">
                     <span className="text-foreground">Campo</span>
@@ -1039,7 +1167,7 @@ const Analyze = () => {
                       className={cn(
                         "border-2 border-dashed rounded-2xl p-12 max-w-lg mx-auto transition-all cursor-pointer",
                         dragOver ? "border-primary bg-primary/10" : "border-border hover:border-primary/50",
-                        form.gpsFile && "border-success bg-success/5"
+                        form.gpsFile && "border-[#1db954] bg-[#1db954]/5"
                       )}
                       onClick={() => document.getElementById("file-input")?.click()}
                     >
@@ -1052,7 +1180,7 @@ const Analyze = () => {
                       />
                       {form.gpsFile ? (
                         <div className="flex items-center justify-center gap-3">
-                          <Check className="h-6 w-6 text-success" />
+                          <Check className="h-6 w-6 text-[#1db954]" />
                           <span className="text-foreground font-medium">{form.gpsFile.name}</span>
                         </div>
                       ) : (
