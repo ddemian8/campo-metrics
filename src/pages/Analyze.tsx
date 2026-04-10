@@ -400,25 +400,17 @@ const Analyze = () => {
     if (currentStepId === "name") setTimeout(() => nameRef.current?.focus(), 300);
   }, [currentStepId]);
 
-  // Loading animation sequence - timed steps that keep going
+  // Extraction loading animation (3 steps for PDF parsing only)
   useEffect(() => {
-    if (!isLoading) return;
-    setLoadingStep(0);
-    const steps = [
-      { delay: 100 },   // step 0 → 1
-      { delay: 2000 },  // step 1 → 2
-      { delay: 4000 },  // step 2 → 3
-      { delay: 6000 },  // step 3 → 4
-      { delay: 8000 },  // step 4 → 5
-      { delay: 15000 }, // step 5 → 6 "Almost there..."
-      { delay: 20000 }, // step 6 → 7 "Finalizing..."
+    if (!isExtracting) return;
+    setExtractionStep(0);
+    const timers = [
+      setTimeout(() => setExtractionStep(1), 100),
+      setTimeout(() => setExtractionStep(2), 2000),
+      setTimeout(() => setExtractionStep(3), 4000),
     ];
-    const timers: NodeJS.Timeout[] = [];
-    steps.forEach((s, i) => {
-      timers.push(setTimeout(() => setLoadingStep(i + 1), s.delay));
-    });
     return () => timers.forEach(clearTimeout);
-  }, [isLoading]);
+  }, [isExtracting]);
 
   // Calculate DOB and age when dropdowns change
   useEffect(() => {
