@@ -1346,8 +1346,7 @@ const Analyze = () => {
                     {renderConsentSection()}
 
                     {(() => {
-                      const allConsent = form.consent.public_profile && form.consent.leaderboard && form.consent.terms;
-                      const canSubmit = form.gpsFile && allConsent;
+                      const canSubmit = form.gpsFile && form.consent.terms;
                       return (
                         <>
                           <Button
