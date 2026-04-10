@@ -106,7 +106,7 @@ const Report = () => {
           .from("anonymous_sessions")
           .select("*")
           .eq("id", id)
-          .single();
+          .maybeSingle();
 
         if (fetchError || !sessionData) {
           setError("Session not found");
