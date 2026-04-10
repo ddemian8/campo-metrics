@@ -112,7 +112,7 @@ IMPORTANT:
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-5-20250514",
+        model: "claude-sonnet-4-5",
         max_tokens: 1500,
         messages: [
           { role: "user", content },
