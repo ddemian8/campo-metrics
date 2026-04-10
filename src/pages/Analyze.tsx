@@ -396,6 +396,7 @@ const Analyze = () => {
         input_method: form.entryMethod || 'manual',
         player_name: form.fullName,
         position: form.position || null,
+        position_specific: form.positionSpecific || null,
         opponent: form.opponent || null,
         gps_data: {
           first_name: firstName,

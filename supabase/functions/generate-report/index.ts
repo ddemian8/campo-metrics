@@ -52,7 +52,7 @@ serve(async (req) => {
 }
 
 PLAYER: ${playerData.fullName || 'Unknown'}
-POSITION: ${playerData.position || 'Unknown'}
+POSITION: ${playerData.positionSpecific || playerData.position || 'Unknown'} (${playerData.position || 'Unknown'})
 SESSION TYPE: ${playerData.sessionType || 'match'}
 TRAINING DAY: ${playerData.mdDay || 'N/A'}
 MATCH: ${playerData.opponent || 'N/A'}

@@ -138,6 +138,7 @@ const Report = () => {
                 height: gps.height_cm || "unknown",
                 weight: gps.weight_kg || null,
                 position: sessionData.position || "unknown",
+                positionSpecific: (sessionData as any).position_specific || sessionData.position || "unknown",
                 teamName: gps.team_name || "unknown",
                 league: gps.league || "unknown",
                 sessionType: sessionData.session_type || "match",
