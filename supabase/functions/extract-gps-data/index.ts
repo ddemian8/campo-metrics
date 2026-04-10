@@ -73,7 +73,8 @@ IMPORTANT:
 - Return ONLY the JSON, no markdown, no explanation`;
 
     // Use Lovable AI Gateway with Gemini vision model
-    const response = await fetch("https://api.lovable.dev/v1/chat/completions", {
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/ai-proxy`, {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${LOVABLE_API_KEY}`,
