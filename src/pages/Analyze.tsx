@@ -236,16 +236,12 @@ const Analyze = () => {
     return () => timers.forEach(clearTimeout);
   }, [isLoading]);
 
-  // Navigate when report is ready AND loading animation has progressed enough
+  // When report is ready, ensure loading steps complete then show button
   useEffect(() => {
     if (!reportReady || !isLoading) return;
-    // Ensure at least the last loading step is shown briefly
-    const minDelay = setTimeout(() => {
-      setLoadingStep(7);
-      setTimeout(() => navigate(`/report/${sessionIdRef.current}`), 800);
-    }, 500);
-    return () => clearTimeout(minDelay);
-  }, [reportReady, isLoading, navigate]);
+    const timer = setTimeout(() => setLoadingStep(7), 500);
+    return () => clearTimeout(timer);
+  }, [reportReady, isLoading]);
 
   // Calculate DOB and age when dropdowns change
   useEffect(() => {
@@ -733,6 +729,7 @@ const Analyze = () => {
       "Writing your AI performance narrative...",
       "Your report is ready.",
     ];
+    const allDone = loadingStep >= 7 && reportReady;
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4">
         <div className="mb-12">
@@ -741,53 +738,75 @@ const Analyze = () => {
             <span className="text-primary">metric</span>
           </span>
         </div>
-        <div className="space-y-4 w-full max-w-md">
-          {lines.map((line, i) => {
-            const isActive = loadingStep === i;
-            const isDone = loadingStep > i;
-            const isVisible = loadingStep >= i;
-            const isLast = i === lines.length - 1;
-            if (!isVisible) return null;
-            return (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className={cn(
-                  "flex items-center gap-3 text-base",
-                  isLast && isDone ? "text-[#1db954] font-bold" : isDone ? "text-muted-foreground" : "text-foreground"
-                )}
-              >
-                {isDone ? (
-                  <Check className="h-5 w-5 text-[#1db954] shrink-0" />
-                ) : isActive ? (
-                  <Loader2 className="h-5 w-5 text-primary animate-spin shrink-0" />
-                ) : null}
-                <span>{line}</span>
-              </motion.div>
-            );
-          })}
-        </div>
-        {reportReady && sessionIdRef.current && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mt-8"
-          >
-            <Button
-              onClick={() => navigate(`/report/${sessionIdRef.current}`)}
-              className="bg-[hsl(157,68%,37%)] hover:bg-[hsl(157,68%,30%)] text-white font-medium h-12 px-8 text-base"
+
+        <AnimatePresence mode="wait">
+          {!allDone ? (
+            <motion.div
+              key="steps"
+              initial={{ opacity: 1 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.4 }}
+              className="space-y-4 w-full max-w-md"
             >
-              View your report →
-            </Button>
-          </motion.div>
-        )}
+              {lines.map((line, i) => {
+                const isActive = loadingStep === i;
+                const isDone = loadingStep > i;
+                const isVisible = loadingStep >= i;
+                const isLast = i === lines.length - 1;
+                if (!isVisible) return null;
+                return (
+                  <motion.div
+                    key={i}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className={cn(
+                      "flex items-center gap-3 text-base",
+                      isLast && isDone ? "text-[#1db954] font-bold" : isDone ? "text-muted-foreground" : "text-foreground"
+                    )}
+                  >
+                    {isDone ? (
+                      <Check className="h-5 w-5 text-[#1db954] shrink-0" />
+                    ) : isActive ? (
+                      <Loader2 className="h-5 w-5 text-primary animate-spin shrink-0" />
+                    ) : null}
+                    <span>{line}</span>
+                  </motion.div>
+                );
+              })}
+            </motion.div>
+          ) : (
+            <motion.div
+              key="ready"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.5, ease: "easeOut" }}
+              className="flex flex-col items-center gap-6"
+            >
+              <div className="flex items-center gap-2 text-[#1db954]">
+                <Check className="h-6 w-6" />
+                <span className="text-xl font-bold">Your report is ready</span>
+              </div>
+              <motion.div
+                animate={{ boxShadow: ["0 0 0 0 rgba(29,158,117,0.4)", "0 0 0 16px rgba(29,158,117,0)", "0 0 0 0 rgba(29,158,117,0)"] }}
+                transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+              >
+                <Button
+                  onClick={() => navigate(`/report/${sessionIdRef.current}`)}
+                  className="bg-[#1D9E75] hover:bg-[#178a64] text-white font-semibold h-14 px-10 text-lg rounded-xl"
+                >
+                  View your report →
+                </Button>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         <div className="absolute bottom-0 left-0 right-0 h-1 bg-muted">
           <motion.div
             className="h-full bg-primary"
             initial={{ width: "0%" }}
-            animate={{ width: "100%" }}
-            transition={{ duration: 7, ease: "linear" }}
+            animate={{ width: allDone ? "100%" : `${(loadingStep / 7) * 100}%` }}
+            transition={{ duration: 0.5, ease: "linear" }}
           />
         </div>
       </div>
