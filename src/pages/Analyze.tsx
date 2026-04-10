@@ -711,7 +711,7 @@ const Analyze = () => {
     setGenerationError(null);
 
     if ((form.entryMethod === "pdf" || form.entryMethod === "screenshot") && form.gpsFile) {
-      setIsLoading(true);
+      setIsExtracting(true);
       try {
         const base64 = await fileToBase64(form.gpsFile);
         const { data: extractResult, error: extractError } = await supabase.functions.invoke("extract-gps-data", {
@@ -719,7 +719,7 @@ const Analyze = () => {
         });
 
         if (extractError || !extractResult?.success) {
-          setIsLoading(false);
+          setIsExtracting(false);
           setExtractionError("We couldn't read your file automatically. Please enter your data manually instead.");
           updateForm({ entryMethod: "manual" });
           return;
@@ -729,7 +729,7 @@ const Analyze = () => {
         setPlatformDetected(extractResult.platform_detected || "unknown");
 
         if (players.length === 0) {
-          setIsLoading(false);
+          setIsExtracting(false);
           setExtractionError("No player data found in the file. Please enter your data manually.");
           updateForm({ entryMethod: "manual" });
           return;
@@ -741,7 +741,7 @@ const Analyze = () => {
         }
 
         // Multi-player → fuzzy match
-        setIsLoading(false);
+        setIsExtracting(false);
         setExtractedPlayers(players);
         const names = players.map(p => p.athlete_name || "Unknown");
         const match = fuzzyMatchPlayer(form.fullName, names);
@@ -755,7 +755,7 @@ const Analyze = () => {
         }
       } catch (err) {
         console.error("File extraction error:", err);
-        setIsLoading(false);
+        setIsExtracting(false);
         setExtractionError("We couldn't read your file automatically. Please enter your data manually instead.");
         updateForm({ entryMethod: "manual" });
       }
