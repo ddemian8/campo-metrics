@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Upload, Image, Keyboard, Shield, Crosshair, Swords, Goal, ChevronLeft, Check, Loader2, FileText, Info, AlertTriangle, Sparkles, HelpCircle } from "lucide-react";
+import { Upload, Image, Keyboard, Shield, Crosshair, Swords, Goal, ChevronLeft, Check, Loader2, FileText, Info, AlertTriangle, Sparkles, HelpCircle, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -213,6 +213,10 @@ type PlayerMatchPhase = null | "confirm" | "select";
 
 const Analyze = () => {
   const navigate = useNavigate();
+  const [authChecking, setAuthChecking] = useState(true);
+  const [authUser, setAuthUser] = useState<any>(null);
+  const [profile, setProfile] = useState<any>(null);
+  const [limitReached, setLimitReached] = useState(false);
   const [step, setStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [loadingStep, setLoadingStep] = useState(0);
