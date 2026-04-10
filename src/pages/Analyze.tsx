@@ -199,14 +199,13 @@ const Analyze = () => {
   useEffect(() => {
     if (!isLoading) return;
     const timers: NodeJS.Timeout[] = [];
-    for (let i = 1; i <= 6; i++) {
+    for (let i = 1; i <= 7; i++) {
       timers.push(setTimeout(() => setLoadingStep(i), i * 1200));
     }
     timers.push(
       setTimeout(() => {
-        const id = crypto.randomUUID();
-        navigate(`/report/${id}`);
-      }, 7500)
+        navigate(`/report/${sessionIdRef.current}`);
+      }, 8700)
     );
     return () => timers.forEach(clearTimeout);
   }, [isLoading, navigate]);
@@ -305,10 +304,18 @@ const Analyze = () => {
           else if (form.age_calculated > 50) e.dob = "Please check your date of birth";
         }
       }
-      if (!form.height_cm) e.height = "Required";
+      if (!form.height_cm) e.height = "Please enter your height";
       else {
-        const h = parseInt(form.height_cm);
-        if (h < 140 || h > 220) e.height = "Please enter a valid height in cm (140–220)";
+        const h = parseFloat(form.height_cm);
+        if (isNaN(h)) e.height = "Please enter a valid number in cm";
+        else if (h < 150) e.height = "Minimum height is 150 cm — please check your entry";
+        else if (h > 210) e.height = "Maximum height is 210 cm — please check your entry";
+      }
+      if (form.weight_kg) {
+        const w = parseFloat(form.weight_kg);
+        if (isNaN(w)) e.weight = "Please enter a valid number in kg";
+        else if (w < 50) e.weight = "Minimum weight is 50 kg — please check your entry";
+        else if (w > 120) e.weight = "Maximum weight is 120 kg — please check your entry";
       }
     }
     if (s === 5) {
@@ -571,11 +578,12 @@ const Analyze = () => {
   // Loading screen
   if (isLoading) {
     const lines = [
-      "Reading your GPS file...",
-      "Identifying your session data...",
-      "Normalising metrics to 90 minutes...",
+      "Reading your GPS data...",
+      "Identifying your session metrics...",
+      "Normalising to 90 minutes...",
       "Comparing with position benchmarks...",
-      "Generating your AI narrative...",
+      "Building your player profile...",
+      "Writing your AI performance narrative...",
       "Your report is ready.",
     ];
     return (
@@ -805,14 +813,15 @@ const Analyze = () => {
                       <input
                         type="number"
                         inputMode="numeric"
-                        min={140}
-                        max={220}
+                        min={150}
+                        max={210}
                         placeholder="e.g. 181"
                         value={form.height_cm}
                         onChange={(e) => updateForm({ height_cm: e.target.value })}
                         className="w-full bg-transparent text-foreground text-base outline-none placeholder:text-muted-foreground/40"
                       />
                       {errors.height && <p className="text-[11px] text-destructive mt-1">{errors.height}</p>}
+                      <p className="text-[11px] text-muted-foreground mt-1">Between 150 cm and 210 cm</p>
                     </div>
 
                     <div className="rounded-lg border border-border/50 bg-[#0d1f35] p-3.5 focus-within:border-primary transition-all">
@@ -823,15 +832,17 @@ const Analyze = () => {
                       <p className="text-[11px] text-muted-foreground mb-2">kg</p>
                       <input
                         type="number"
-                        inputMode="numeric"
-                        min={40}
-                        max={130}
+                        inputMode="decimal"
+                        min={50}
+                        max={120}
+                        step={0.5}
                         placeholder="e.g. 75"
                         value={form.weight_kg}
                         onChange={(e) => updateForm({ weight_kg: e.target.value })}
                         className="w-full bg-transparent text-foreground text-base outline-none placeholder:text-muted-foreground/40"
                       />
-                      <p className="text-[11px] text-muted-foreground mt-2">Used only for AI intensity normalisation. Not shown publicly.</p>
+                      {errors.weight && <p className="text-[11px] text-destructive mt-1">{errors.weight}</p>}
+                      <p className="text-[11px] text-muted-foreground mt-1">Between 50 kg and 120 kg — used only for AI intensity calculations, never shown publicly</p>
                     </div>
                   </div>
                 </div>
