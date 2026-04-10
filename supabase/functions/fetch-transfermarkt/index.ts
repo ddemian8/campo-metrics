@@ -5,8 +5,13 @@ const corsHeaders = {
 import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts'
 
 const BodySchema = z.object({
-  url: z.string().url().refine(u => u.includes('transfermarkt.com'), {
-    message: 'URL must be from transfermarkt.com',
+  url: z.string().url().refine(u => {
+    try {
+      const hostname = new URL(u).hostname;
+      return hostname === 'transfermarkt.com' || hostname.endsWith('.transfermarkt.com') || /^(www\.)?transfermarkt\.[a-z.]+$/.test(hostname);
+    } catch { return false; }
+  }, {
+    message: 'URL must be from a Transfermarkt domain (e.g. transfermarkt.com, transfermarkt.ro, transfermarkt.de)',
   }),
 })
 
