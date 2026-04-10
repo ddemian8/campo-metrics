@@ -22,10 +22,13 @@ serve(async (req) => {
     const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
     if (!ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY is not configured");
 
-    const extractionPrompt = `You are a GPS football performance data extraction specialist. 
-Extract ALL GPS performance metrics you can find from this ${fileType === "pdf" ? "PDF document" : "screenshot/image"}.
+    const extractionPrompt = `You are a GPS football performance data extraction specialist.
+Extract ALL players' GPS performance metrics from this ${fileType === "pdf" ? "PDF document" : "screenshot/image"}.
 
-Look for these specific metrics (they may be labeled differently across platforms like STATSports, Catapult, gpexe, Polar, Playertek):
+This file likely contains a TEAM report with data for MULTIPLE players in a table format.
+
+Look for these specific metrics per player (they may be labeled differently across platforms like STATSports, Catapult, gpexe, Polar, Playertek):
+- Player/Athlete name
 - Duration (session length in mm:ss or minutes)
 - Total Distance (in meters or km)
 - Max Speed / Top Speed (in km/h or m/s)
@@ -33,13 +36,12 @@ Look for these specific metrics (they may be labeled differently across platform
 - Sprint events / Sprint count
 - HMLD / High Metabolic Load Distance (in meters)
 - Distance in Speed Zone 4 (in meters)
-- Distance in Speed Zone 4+ (in meters)  
+- Distance in Speed Zone 4+ (in meters)
 - Distance in Speed Zone 5 / Sprint Distance (in meters)
 - Acceleration events count
 - Deceleration events count
 - High Speed Running distance / HSR (in meters)
-- Heart rate max / avg (if available)
-- Player/Athlete name (if visible)
+- Minutes played
 
 Common alternative labels:
 - "High Intensity Distance" = HMLD
@@ -48,34 +50,38 @@ Common alternative labels:
 - "Max Vel" or "Peak Speed" = max_sp
 - "Tot. Dist" or "Total Dist." = distance
 
-Return ONLY a valid JSON object with this exact structure (use null for any metric you cannot find):
+Return ONLY a valid JSON object with this exact structure:
 {
-  "duration": "mm:ss format string or null",
-  "distance": number_in_meters_or_null,
-  "max_sp": number_in_kmh_or_null,
-  "av_sp": number_in_kmh_or_null,
-  "sp_ev": number_or_null,
-  "hmld": number_in_meters_or_null,
-  "dist_sp_z4": number_in_meters_or_null,
-  "dist_sp_z4plus": number_in_meters_or_null,
-  "dist_sp_z5": number_in_meters_or_null,
-  "acc_ev": number_or_null,
-  "dec_ev": number_or_null,
-  "athlete_name": "string or null",
-  "extracted_metrics_count": number_of_non_null_metrics,
-  "platform_detected": "STATSports|Catapult|gpexe|Polar|Playertek|unknown"
+  "multi_player": true_or_false,
+  "platform_detected": "STATSports|Catapult|gpexe|Polar|Playertek|unknown",
+  "players": [
+    {
+      "athlete_name": "Player Full Name",
+      "duration": "mm:ss format string or null",
+      "distance": number_in_meters_or_null,
+      "max_sp": number_in_kmh_or_null,
+      "av_sp": number_in_kmh_or_null,
+      "sp_ev": number_or_null,
+      "hmld": number_in_meters_or_null,
+      "dist_sp_z4": number_in_meters_or_null,
+      "dist_sp_z4plus": number_in_meters_or_null,
+      "dist_sp_z5": number_in_meters_or_null,
+      "acc_ev": number_or_null,
+      "dec_ev": number_or_null,
+      "minutes_played": number_or_null
+    }
+  ]
 }
 
-IMPORTANT: 
+IMPORTANT:
 - Convert km to meters if distance is in km (multiply by 1000)
 - Convert m/s to km/h if speed is in m/s (multiply by 3.6)
-- If a table has multiple players, try to extract data for ALL visible players and return the FIRST player's data
+- If the document contains data for MULTIPLE players (a team report), include ALL players in the "players" array and set "multi_player" to true
+- If only ONE player's data is found, still use the "players" array with one entry and set "multi_player" to false
+- Extract the full name of each player exactly as shown in the document
 - Return ONLY the JSON, no markdown, no explanation`;
 
-    // Determine the media type for Anthropic's vision API
     let mediaType = mimeType || "image/png";
-    
-    // For PDFs, Anthropic supports document type
     const isPdf = fileType === "pdf" || mediaType === "application/pdf";
     
     const content: any[] = [{ type: "text", text: extractionPrompt }];
@@ -90,7 +96,6 @@ IMPORTANT:
         },
       });
     } else {
-      // Image types
       if (!["image/jpeg", "image/png", "image/webp", "image/gif"].includes(mediaType)) {
         mediaType = "image/png";
       }
@@ -113,7 +118,7 @@ IMPORTANT:
       },
       body: JSON.stringify({
         model: "claude-sonnet-4-5",
-        max_tokens: 1500,
+        max_tokens: 4000,
         messages: [
           { role: "user", content },
         ],
@@ -151,18 +156,35 @@ IMPORTANT:
       });
     }
 
-    // Check if we got any usable metrics
-    const usableFields = ["distance", "max_sp", "av_sp", "sp_ev", "hmld", "dist_sp_z4", "dist_sp_z5", "acc_ev", "dec_ev", "duration"];
-    const foundCount = usableFields.filter((f) => extracted[f] !== null && extracted[f] !== undefined).length;
-
-    if (foundCount === 0) {
+    // Validate we got players array
+    const players = extracted.players;
+    if (!Array.isArray(players) || players.length === 0) {
       return new Response(JSON.stringify({ success: false, error: "No GPS metrics found in the file" }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    return new Response(JSON.stringify({ success: true, data: extracted, metricsFound: foundCount }), {
+    // Count usable metrics across all players
+    const usableFields = ["distance", "max_sp", "av_sp", "sp_ev", "hmld", "dist_sp_z4", "dist_sp_z5", "acc_ev", "dec_ev", "duration"];
+    const totalFound = players.reduce((sum: number, p: any) => {
+      return sum + usableFields.filter((f) => p[f] !== null && p[f] !== undefined).length;
+    }, 0);
+
+    if (totalFound === 0) {
+      return new Response(JSON.stringify({ success: false, error: "No GPS metrics found in the file" }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    return new Response(JSON.stringify({
+      success: true,
+      multi_player: extracted.multi_player || players.length > 1,
+      platform_detected: extracted.platform_detected || "unknown",
+      players,
+      metricsFound: totalFound,
+    }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
