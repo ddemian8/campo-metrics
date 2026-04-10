@@ -308,20 +308,20 @@ const Report = () => {
                   )}
                   <span className="text-[13px] text-muted-foreground">
                     {[
-                      session.age_calculated ? `${session.age_calculated} years` : null,
-                      session.height_cm ? `${session.height_cm} cm` : null,
-                      session.weight_kg ? `${session.weight_kg} kg` : null,
+                      gps.age_calculated ? `${gps.age_calculated} years` : null,
+                      gps.height_cm ? `${gps.height_cm} cm` : null,
+                      gps.weight_kg ? `${gps.weight_kg} kg` : null,
                     ].filter(Boolean).join(" · ")}
                   </span>
                 </div>
-                {(session.team_name || session.league) && (
+                {(gps.team_name || gps.league) && (
                   <p className="text-[13px] text-muted-foreground mt-0.5">
-                    {[session.team_name, session.league].filter(Boolean).join(" · ")}
+                    {[gps.team_name, gps.league].filter(Boolean).join(" · ")}
                   </p>
                 )}
-                {session.transfermarkt_url && (
+                {gps.transfermarkt_url && (
                   <a
-                    href={session.transfermarkt_url}
+                    href={gps.transfermarkt_url}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-[12px] text-primary hover:underline inline-flex items-center gap-1 mt-1"
