@@ -356,6 +356,7 @@ const Analyze = () => {
     try {
       const sessionId = crypto.randomUUID();
       sessionIdRef.current = sessionId;
+      const { firstName, lastName } = splitName(form.fullName);
 
       await supabase.from('sessions').insert({
         id: sessionId,
