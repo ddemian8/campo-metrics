@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,8 @@ import { Eye, EyeOff, Loader2 } from "lucide-react";
 
 const Signup = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const redirectTo = searchParams.get("redirectTo") || "/dashboard";
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -58,7 +60,7 @@ const Signup = () => {
           .eq("user_id", data.user.id);
       }
 
-      navigate("/dashboard");
+      navigate(redirectTo);
     } catch {
       setGeneralError("Something went wrong. Please try again.");
     } finally {
@@ -79,6 +81,12 @@ const Signup = () => {
 
         {/* Card */}
         <div className="rounded-xl border border-border bg-card p-8">
+          {redirectTo !== "/dashboard" && (
+            <div className="mb-4 rounded-lg bg-primary/10 border border-primary/20 px-4 py-3 text-sm text-foreground">
+              <p className="font-medium">Create your free account to start analyzing your GPS data.</p>
+              <p className="text-xs text-muted-foreground mt-1">It takes 30 seconds. No credit card required.</p>
+            </div>
+          )}
           <h1 className="text-2xl font-bold text-foreground mb-1 font-sans">Create your free account</h1>
           <p className="text-muted-foreground text-sm mb-6">Start analyzing your GPS performance data today.</p>
 

@@ -1,20 +1,16 @@
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import {
-  Check,
   Loader2,
   Download,
   Share2,
-  User,
-  ArrowRight,
   ExternalLink,
-  X,
   ChevronRight,
+  ArrowLeft,
+  Crown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -51,6 +47,7 @@ interface GpsData {
   transfermarkt_url?: string;
   transfermarkt_club?: string;
   transfermarkt_league?: string;
+  position_zone?: string;
   duration?: string;
   distance?: number;
   max_sp?: number;
@@ -64,17 +61,6 @@ interface GpsData {
   dist_sp_z5?: number;
 }
 
-interface SessionData {
-  id: string;
-  player_name: string | null;
-  position: string | null;
-  session_type: string | null;
-  training_day: string | null;
-  session_date: string | null;
-  opponent: string | null;
-  gps_data: GpsData | null;
-}
-
 const positionColors: Record<string, string> = {
   GK: "bg-muted text-muted-foreground",
   DEF: "bg-primary/20 text-primary",
@@ -84,54 +70,87 @@ const positionColors: Record<string, string> = {
 
 const Report = () => {
   const { id } = useParams();
-  const [session, setSession] = useState<SessionData | null>(null);
+  const navigate = useNavigate();
+  const [session, setSession] = useState<any>(null);
   const [report, setReport] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showSignup, setShowSignup] = useState(false);
-  const [signupEmail, setSignupEmail] = useState("");
-  const [signupPassword, setSignupPassword] = useState("");
-  const [signupTerms, setSignupTerms] = useState(false);
-  const [signupLoading, setSignupLoading] = useState(false);
-  const [signupSuccess, setSignupSuccess] = useState(false);
-  const [signupError, setSignupError] = useState("");
-  const [isLogin, setIsLogin] = useState(false);
+  const [userPlan, setUserPlan] = useState<string>("free");
+  const [reportsUsed, setReportsUsed] = useState(0);
 
   useEffect(() => {
     if (!id) return;
 
     const fetchReport = async () => {
       try {
-        const { data: sessionData, error: fetchError } = await supabase
-          .from("anonymous_sessions")
-          .select("*")
-          .eq("id", id)
+        // Try fetching from reports table via session_id
+        const { data: reportRow } = await supabase
+          .from("reports")
+          .select("*, sessions(*)")
+          .eq("session_id", id)
           .maybeSingle();
 
-        if (fetchError || !sessionData) {
-          setError("Session not found");
-          setLoading(false);
-          return;
+        if (reportRow) {
+          const sess = reportRow.sessions as any;
+          const gps = (sess?.gps_data as GpsData) || {};
+          setSession({
+            id: sess?.id,
+            player_name: `${gps.first_name || ""} ${gps.last_name || ""}`.trim() || null,
+            position: gps.position_zone || sess?.position_specific || null,
+            session_type: sess?.session_type,
+            training_day: sess?.training_day,
+            session_date: sess?.session_date,
+            opponent: sess?.opponent,
+            gps_data: gps,
+          });
+          if (reportRow.ai_report) {
+            setReport(reportRow.ai_report as unknown as ReportData);
+          } else {
+            setError("Report not yet generated.");
+          }
+        } else {
+          // Fallback: try anonymous_sessions for legacy reports
+          const { data: anonData } = await supabase
+            .from("anonymous_sessions")
+            .select("*")
+            .eq("id", id)
+            .maybeSingle();
+
+          if (anonData) {
+            const gps = (anonData.gps_data as GpsData) || {};
+            setSession({
+              id: anonData.id,
+              player_name: anonData.player_name,
+              position: anonData.position,
+              session_type: anonData.session_type,
+              training_day: anonData.training_day,
+              session_date: anonData.session_date,
+              opponent: anonData.opponent,
+              gps_data: gps,
+            });
+            if (anonData.ai_report) {
+              setReport(anonData.ai_report as unknown as ReportData);
+            } else {
+              setError("Report not yet generated.");
+            }
+          } else {
+            setError("Report not found");
+          }
         }
 
-        const gps = (sessionData.gps_data as GpsData) || {};
-        const mapped: SessionData = {
-          id: sessionData.id,
-          player_name: sessionData.player_name,
-          position: sessionData.position,
-          session_type: sessionData.session_type,
-          training_day: sessionData.training_day,
-          session_date: sessionData.session_date,
-          opponent: sessionData.opponent,
-          gps_data: gps,
-        };
-        setSession(mapped);
-
-        // Use the pre-generated AI report from the session
-        if (sessionData.ai_report) {
-          setReport(sessionData.ai_report as unknown as ReportData);
-        } else {
-          setError("Report not yet generated. Please wait and refresh.");
+        // Get user plan info
+        const { data: { session: authSession } } = await supabase.auth.getSession();
+        if (authSession) {
+          const { data: profileData } = await supabase
+            .from("profiles")
+            .select("subscription_plan, account_type, reports_used_this_month")
+            .eq("user_id", authSession.user.id)
+            .maybeSingle();
+          if (profileData) {
+            const isPaid = profileData.subscription_plan !== "free" || profileData.account_type !== "free";
+            setUserPlan(isPaid ? "pro" : "free");
+            setReportsUsed(profileData.reports_used_this_month || 0);
+          }
         }
       } catch (e) {
         console.error("Report error:", e);
@@ -143,46 +162,6 @@ const Report = () => {
 
     fetchReport();
   }, [id]);
-
-  const handleAuth = async () => {
-    if (!signupEmail || !signupPassword) {
-      setSignupError("Please fill in all fields");
-      return;
-    }
-    if (signupPassword.length < 8) {
-      setSignupError("Password must be at least 8 characters");
-      return;
-    }
-    if (!isLogin && !signupTerms) {
-      setSignupError("Please accept the Terms of Service");
-      return;
-    }
-
-    setSignupLoading(true);
-    setSignupError("");
-
-    try {
-      if (isLogin) {
-        const { error } = await supabase.auth.signInWithPassword({
-          email: signupEmail,
-          password: signupPassword,
-        });
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.auth.signUp({
-          email: signupEmail,
-          password: signupPassword,
-          options: { emailRedirectTo: window.location.origin },
-        });
-        if (error) throw error;
-      }
-      setSignupSuccess(true);
-    } catch (e: any) {
-      setSignupError(e.message || "Authentication failed");
-    } finally {
-      setSignupLoading(false);
-    }
-  };
 
   const getScoreColor = (score: number) => {
     if (score >= 75) return "text-[#1db954]";
@@ -204,7 +183,7 @@ const Report = () => {
           <span className="text-primary">metric</span>
         </span>
         <Loader2 className="h-8 w-8 text-primary animate-spin mb-4" />
-        <p className="text-muted-foreground">Generating your AI report...</p>
+        <p className="text-muted-foreground">Loading your report...</p>
       </div>
     );
   }
@@ -227,9 +206,9 @@ const Report = () => {
   }
 
   const gps = session.gps_data || {};
-  const fullName = session.player_name || `${gps.first_name || ''} ${gps.last_name || ''}`.trim() || 'Unknown';
-  const nameParts = fullName.split(' ');
-  const initials = `${nameParts[0]?.[0] || ''}${nameParts[nameParts.length - 1]?.[0] || ''}`.toUpperCase();
+  const fullName = session.player_name || `${gps.first_name || ""} ${gps.last_name || ""}`.trim() || "Unknown";
+  const nameParts = fullName.split(" ");
+  const initials = `${nameParts[0]?.[0] || ""}${nameParts[nameParts.length - 1]?.[0] || ""}`.toUpperCase();
   const sessionInfo = [
     session.session_type === "match" ? "Match" : "Training",
     session.training_day,
@@ -238,15 +217,6 @@ const Report = () => {
   ]
     .filter(Boolean)
     .join(" · ");
-
-  const metrics = [
-    { label: "Total Distance", value: gps.distance ? `${gps.distance}m` : "—" },
-    { label: "Max Speed", value: gps.max_sp ? `${gps.max_sp} km/h` : "—" },
-    { label: "Sprint Count", value: gps.sp_ev ?? "—" },
-    { label: "HMLD", value: gps.hmld ? `${gps.hmld}m` : "—" },
-    { label: "Duration", value: gps.duration || "—" },
-    { label: "Avg Speed", value: gps.av_sp ? `${gps.av_sp} km/h` : "—" },
-  ];
 
   return (
     <div className="min-h-screen bg-background">
@@ -257,16 +227,21 @@ const Report = () => {
             <span className="text-foreground">Campo</span>
             <span className="text-primary">metric</span>
           </Link>
-          <Link to="/analyze">
-            <Button variant="ghost" size="sm">
-              New session <ChevronRight className="h-4 w-4 ml-1" />
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="sm" onClick={() => navigate("/dashboard")}>
+              <ArrowLeft className="h-4 w-4 mr-1" /> Dashboard
             </Button>
-          </Link>
+            <Link to="/analyze">
+              <Button variant="ghost" size="sm">
+                New session <ChevronRight className="h-4 w-4 ml-1" />
+              </Button>
+            </Link>
+          </div>
         </div>
       </div>
 
       <div className="container max-w-3xl py-8 px-4 space-y-6">
-        {/* SECTION 1 — Player Profile Card */}
+        {/* Player Profile Card */}
         <div className="rounded-2xl border border-border/50 bg-card p-6">
           <div className="flex flex-col sm:flex-row items-start gap-4">
             <div className="flex items-center gap-4 flex-1">
@@ -314,7 +289,7 @@ const Report = () => {
 
         {report ? (
           <>
-            {/* SECTION 2 — Performance Score */}
+            {/* Performance Score */}
             <div className="rounded-2xl border border-border/50 bg-card p-6 text-center">
               <div className={cn("inline-flex flex-col items-center justify-center w-24 h-24 rounded-full border-2 mb-4", getScoreBg(report.performanceScore))}>
                 <span className={cn("text-4xl font-bold", getScoreColor(report.performanceScore))}>
@@ -327,13 +302,13 @@ const Report = () => {
               <p className="text-lg font-medium text-foreground mt-4">{report.headline}</p>
             </div>
 
-            {/* SECTION 3 — Executive Summary */}
+            {/* Executive Summary */}
             <div className="rounded-2xl border border-border/50 bg-card p-6">
               <h3 className="text-sm font-semibold text-foreground mb-3">Executive Summary</h3>
               <p className="text-sm text-muted-foreground leading-[1.8]">{report.executiveSummary}</p>
             </div>
 
-            {/* SECTION 4 — Key Metrics */}
+            {/* Key Metrics */}
             <div className="rounded-2xl border border-border/50 bg-card p-6">
               <h3 className="text-sm font-semibold text-foreground mb-4">Key Metrics</h3>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -352,7 +327,7 @@ const Report = () => {
               </div>
             </div>
 
-            {/* SECTION 5 — Strengths & Improvements */}
+            {/* Strengths & Improvements */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="rounded-2xl border border-border/50 bg-card p-5 border-l-[3px] border-l-[#1db954]">
                 <h3 className="text-sm font-semibold text-foreground mb-2">{report.standoutStrength?.title}</h3>
@@ -364,7 +339,7 @@ const Report = () => {
               </div>
             </div>
 
-            {/* SECTION 6 — Positional Context & Motivational Close */}
+            {/* Positional Context & Motivational Close */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="rounded-lg bg-secondary p-4">
                 <p className="text-[11px] text-muted-foreground mb-1">positional context</p>
@@ -376,7 +351,7 @@ const Report = () => {
               </div>
             </div>
 
-            {/* SECTION 7 — Training Recommendation */}
+            {/* Training Recommendation */}
             <div className="rounded-2xl border-l-[3px] border-l-primary bg-[#0d2a4a] p-5">
               <p className="text-[12px] font-semibold text-primary mb-2">{report.trainingRecommendation?.title}</p>
               <p className="text-sm text-[#a8c0e0] mb-1">{report.trainingRecommendation?.drill}</p>
@@ -391,124 +366,52 @@ const Report = () => {
           </div>
         )}
 
-        {/* CTA Section */}
-        <div className="rounded-2xl border border-border/50 bg-card p-6 space-y-3">
-          <div className="flex flex-col sm:flex-row gap-3">
-            <Button className="flex-1 h-11" onClick={() => window.print()}>
-              <Download className="h-4 w-4 mr-2" /> Download PDF report
-            </Button>
-            <Button
-              variant="outline"
-              className="flex-1 h-11"
-              onClick={() => setShowSignup(true)}
-            >
-              <User className="h-4 w-4 mr-2" /> Save to your profile →
-            </Button>
-            <Button variant="ghost" className="flex-1 h-11">
-              <Share2 className="h-4 w-4 mr-2" /> Share your ranking
-            </Button>
-          </div>
-          <p className="text-[11px] text-muted-foreground text-center">
-            Free — no account needed for PDF download
-          </p>
-        </div>
-
-        {/* Inline Signup */}
-        <AnimatePresence>
-          {showSignup && !signupSuccess && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 10 }}
-              transition={{ duration: 0.3 }}
-              className="rounded-2xl bg-[#0d1f35] border border-border/50 p-5 relative"
-            >
-              <button
-                onClick={() => setShowSignup(false)}
-                className="absolute top-3 right-3 text-muted-foreground hover:text-foreground"
-              >
-                <X className="h-4 w-4" />
-              </button>
-              <h3 className="text-sm font-bold text-foreground mb-1">
-                {isLogin ? "Log in to save this report" : "Create your free account to save this report"}
-              </h3>
-              <p className="text-[12px] text-muted-foreground mb-4">
-                {isLogin
-                  ? "Welcome back! Your report will be saved automatically."
-                  : "Your report, profile and GPS history will be saved permanently. Takes 20 seconds."}
-              </p>
-              <div className="space-y-3">
-                <Input
-                  type="email"
-                  placeholder="your@email.com"
-                  value={signupEmail}
-                  onChange={(e) => setSignupEmail(e.target.value)}
-                  className="h-11 bg-secondary border-border"
-                />
-                <Input
-                  type="password"
-                  placeholder={isLogin ? "Your password" : "Create a password (min 8 chars)"}
-                  value={signupPassword}
-                  onChange={(e) => setSignupPassword(e.target.value)}
-                  className="h-11 bg-secondary border-border"
-                />
-                {!isLogin && (
-                  <label className="flex items-start gap-2 cursor-pointer">
-                    <div
-                      className={cn(
-                        "mt-0.5 h-4 w-4 shrink-0 rounded border flex items-center justify-center transition-all",
-                        signupTerms ? "bg-primary border-primary" : "border-border"
-                      )}
-                      onClick={() => setSignupTerms(!signupTerms)}
-                    >
-                      {signupTerms && <Check className="h-3 w-3 text-primary-foreground" />}
-                    </div>
-                    <span className="text-[12px] text-muted-foreground">
-                      I agree to the{" "}
-                      <a href="/terms" className="text-primary hover:underline">Terms of Service</a> and{" "}
-                      <a href="/privacy" className="text-primary hover:underline">Privacy Policy</a>
-                    </span>
-                  </label>
-                )}
-                {signupError && (
-                  <p className="text-[12px] text-destructive">{signupError}</p>
-                )}
-                <Button
-                  onClick={handleAuth}
-                  disabled={signupLoading}
-                  className="w-full h-11"
-                >
-                  {signupLoading ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : isLogin ? (
-                    "Log in & save report →"
-                  ) : (
-                    "Create account & save report →"
-                  )}
-                </Button>
-                <button
-                  onClick={() => setIsLogin(!isLogin)}
-                  className="text-[12px] text-primary hover:underline w-full text-center"
-                >
-                  {isLogin ? "Don't have an account? Sign up" : "Already have an account? Log in"}
-                </button>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {signupSuccess && (
-          <div className="rounded-2xl bg-[#0d3320] border border-[#1db954]/30 p-5 text-center">
-            <Check className="h-6 w-6 text-[#1db954] mx-auto mb-2" />
-            <p className="text-sm font-medium text-[#1db954]">
-              {isLogin ? "Logged in! Your report has been saved." : "Account created! Your report has been saved to your profile."}
+        {/* CTA Section — varies by plan */}
+        {userPlan === "pro" ? (
+          <div className="rounded-2xl border border-border/50 bg-card p-6 space-y-3">
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Button className="flex-1 h-11" onClick={() => window.print()}>
+                <Download className="h-4 w-4 mr-2" /> Download PDF
+              </Button>
+              <Button variant="outline" className="flex-1 h-11">
+                <Share2 className="h-4 w-4 mr-2" /> Share report
+              </Button>
+              <Button variant="ghost" className="flex-1 h-11" onClick={() => navigate("/dashboard")}>
+                <ArrowLeft className="h-4 w-4 mr-2" /> Back to Dashboard
+              </Button>
+            </div>
+            <p className="text-[11px] text-muted-foreground text-center">
+              ✓ This report is public and visible to scouts on leaderboards
             </p>
-            <Link
-              to="/dashboard"
-              className="text-[12px] text-primary hover:underline mt-2 inline-block"
-            >
-              Go to your profile →
-            </Link>
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-border/50 bg-card p-6 space-y-4">
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Button className="flex-1 h-11" onClick={() => window.print()}>
+                <Download className="h-4 w-4 mr-2" /> Download PDF
+              </Button>
+              <Button variant="ghost" className="flex-1 h-11" onClick={() => navigate("/dashboard")}>
+                <ArrowLeft className="h-4 w-4 mr-2" /> Back to Dashboard
+              </Button>
+            </div>
+            <div className="rounded-xl bg-[#0d2a4a] border border-primary/20 p-4 text-center">
+              <Crown className="h-5 w-5 text-primary mx-auto mb-2" />
+              <p className="text-sm text-foreground font-medium mb-1">
+                This report is private
+              </p>
+              <p className="text-xs text-muted-foreground mb-3">
+                Upgrade to Player Pro to make it visible to scouts and appear on leaderboards.
+              </p>
+              <Button
+                onClick={() => navigate("/#pricing")}
+                className="bg-[#1D9E75] hover:bg-[#178a64] text-white font-semibold h-10 px-6"
+              >
+                Go Pro — €9/month →
+              </Button>
+              <p className="text-[11px] text-muted-foreground mt-3">
+                {reportsUsed} of 3 free reports used this month
+              </p>
+            </div>
           </div>
         )}
       </div>

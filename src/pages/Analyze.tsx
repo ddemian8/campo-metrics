@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Upload, Image, Keyboard, Shield, Crosshair, Swords, Goal, ChevronLeft, Check, Loader2, FileText, Info, AlertTriangle, Sparkles, HelpCircle } from "lucide-react";
+import { Upload, Image, Keyboard, Shield, Crosshair, Swords, Goal, ChevronLeft, Check, Loader2, FileText, Info, AlertTriangle, Sparkles, HelpCircle, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -213,6 +213,10 @@ type PlayerMatchPhase = null | "confirm" | "select";
 
 const Analyze = () => {
   const navigate = useNavigate();
+  const [authChecking, setAuthChecking] = useState(true);
+  const [authUser, setAuthUser] = useState<any>(null);
+  const [profile, setProfile] = useState<any>(null);
+  const [limitReached, setLimitReached] = useState(false);
   const [step, setStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [loadingStep, setLoadingStep] = useState(0);
@@ -279,6 +283,32 @@ const Analyze = () => {
       terms: false,
     },
   });
+
+  // Auth gate: check if user is logged in and has reports remaining
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        navigate("/signup?redirectTo=/analyze", { replace: true });
+        return;
+      }
+      setAuthUser(session.user);
+      const { data: profileData } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("user_id", session.user.id)
+        .maybeSingle();
+      setProfile(profileData);
+      if (profileData) {
+        const isPaid = profileData.subscription_plan !== "free" || profileData.account_type !== "free";
+        if (!isPaid && (profileData.reports_used_this_month || 0) >= 3) {
+          setLimitReached(true);
+        }
+      }
+      setAuthChecking(false);
+    };
+    checkAuth();
+  }, [navigate]);
 
   const updateConsent = useCallback((field: keyof FormState['consent'], value: boolean) => {
     setForm((prev) => ({
@@ -509,22 +539,26 @@ const Analyze = () => {
     setIsLoading(true);
     setPlayerMatchPhase(null);
     try {
+      if (!authUser || !profile) {
+        setExtractionError("You must be logged in.");
+        setIsLoading(false);
+        return;
+      }
+
       const sessionId = crypto.randomUUID();
       sessionIdRef.current = sessionId;
       const { firstName, lastName } = splitName(form.fullName);
-      const anonymousToken = crypto.randomUUID();
-      localStorage.setItem(`report_token_${sessionId}`, anonymousToken);
 
-      await supabase.from('anonymous_sessions').insert({
+      // Insert into sessions table (authenticated)
+      const { error: sessErr } = await supabase.from('sessions').insert({
         id: sessionId,
-        anonymous_token: anonymousToken,
+        player_id: profile.id,
         session_type: form.sessionType || 'match',
-        session_date: form.sessionDate || null,
+        session_date: form.sessionDate || format(new Date(), 'yyyy-MM-dd'),
         training_day: form.mdDay || null,
         input_method: form.entryMethod === 'pdf' ? 'pdf_upload' : (form.entryMethod || 'manual'),
-        player_name: form.fullName,
-        position: form.position || null,
         opponent: form.opponent || null,
+        position_specific: form.positionSpecific || null,
         gps_data: {
           position_zone: form.position || null,
           position_specific: form.positionSpecific || null,
@@ -541,14 +575,18 @@ const Analyze = () => {
           transfermarkt_club: form.transfermarkt_data.club,
           transfermarkt_league: form.transfermarkt_data.league,
           ...gpsMetrics,
-          consent_public_profile: form.consent.public_profile,
-          consent_leaderboard: form.consent.leaderboard,
-          consent_terms: form.consent.terms,
-          consent_timestamp: new Date().toISOString(),
         },
         status: 'processing',
-      } as any);
+      });
 
+      if (sessErr) {
+        console.error('Session insert error:', sessErr);
+        setIsLoading(false);
+        setExtractionError('Failed to save session. Please try again.');
+        return;
+      }
+
+      // Call generate-report
       const { data: reportData, error: reportError } = await supabase.functions.invoke('generate-report', {
         body: {
           playerData: {
@@ -581,11 +619,29 @@ const Analyze = () => {
         return;
       }
 
-      await supabase.from('anonymous_sessions').update({
-        ai_report: reportData.report,
-        status: 'completed',
-      } as any).eq('id', sessionId);
+      // Determine if report should be public
+      const isPaid = profile.subscription_plan !== 'free' || profile.account_type !== 'free';
 
+      // Insert into reports table
+      await supabase.from('reports').insert({
+        session_id: sessionId,
+        player_id: profile.id,
+        ai_report: reportData.report,
+        is_public: isPaid,
+        model_used: reportData.model || 'claude',
+      });
+
+      // Update session status
+      await supabase.from('sessions').update({ status: 'completed' } as any).eq('id', sessionId);
+
+      // Increment reports_used_this_month for free users
+      if (!isPaid) {
+        await supabase.from('profiles').update({
+          reports_used_this_month: (profile.reports_used_this_month || 0) + 1,
+        }).eq('id', profile.id);
+      }
+
+      // Store the report ID for navigation (use session ID as lookup)
       setReportReady(true);
     } catch (err) {
       console.error('Error in submission:', err);
@@ -834,6 +890,45 @@ const Analyze = () => {
       </div>
     );
   };
+
+  // Auth checking screen
+  if (authChecking) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="h-8 w-8 text-primary animate-spin" />
+      </div>
+    );
+  }
+
+  // Report limit reached screen
+  if (limitReached) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4 text-center">
+        <div className="mb-8">
+          <span className="text-2xl font-bold tracking-tight">
+            <span className="text-foreground">Campo</span>
+            <span className="text-primary">metric</span>
+          </span>
+        </div>
+        <Lock className="h-12 w-12 text-muted-foreground mb-4" />
+        <h1 className="text-2xl font-bold text-foreground mb-2">You've used all 3 free reports this month</h1>
+        <p className="text-muted-foreground mb-8 max-w-md">
+          Upgrade to Player Pro for unlimited reports — €9/month
+        </p>
+        <div className="flex flex-col sm:flex-row gap-3">
+          <Button
+            onClick={() => navigate("/#pricing")}
+            className="bg-[#1D9E75] hover:bg-[#178a64] text-white font-semibold h-12 px-8"
+          >
+            Upgrade to Pro →
+          </Button>
+          <Button variant="outline" onClick={() => navigate("/dashboard")}>
+            View past reports →
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   // Player confirmation/selection screen
   if (playerMatchPhase === "confirm" && extractedPlayers.length > 0) {
