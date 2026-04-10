@@ -366,8 +366,6 @@ const Analyze = () => {
         if (!form.manualData.sp_ev) e.sp_ev = "Required";
         if (!form.manualData.hmld) e.hmld = "Required";
       }
-      if (!form.consent.public_profile) e.consent_public_profile = "You must accept this to generate your report and be discoverable on Campometric.";
-      if (!form.consent.leaderboard) e.consent_leaderboard = "Leaderboard participation is required to use the Campometric platform.";
       if (!form.consent.terms) e.consent_terms = "Please accept the Terms of Service and Privacy Policy to continue.";
     }
     setErrors(e);
@@ -485,7 +483,6 @@ const Analyze = () => {
         input_method: form.entryMethod || 'manual',
         player_name: form.fullName,
         position: form.position || null,
-        position_specific: form.positionSpecific || null,
         opponent: form.opponent || null,
         gps_data: {
           position_zone: form.position || null,
@@ -517,22 +514,18 @@ const Analyze = () => {
 
   const consentCheckboxes = [
     {
-      id: "public_profile" as const,
-      label: "I agree to make my performance data visible to Agents, Clubs and Scouts on the Campometric platform.",
-      description: "Your name, position, team and GPS metrics will be visible to verified scouts and agents searching the Campometric database.",
-      errorKey: "consent_public_profile",
-    },
-    {
-      id: "leaderboard" as const,
-      label: "I agree to appear on the public Campometric Leaderboard ranked by physical performance metrics.",
-      description: "Your name, position, league and key metrics (distance, max speed, sprints) will appear on the public leaderboard visible to anyone visiting campometric.com.",
-      errorKey: "consent_leaderboard",
-    },
-    {
       id: "terms" as const,
       label: "__terms__",
       description: "You must be at least 16 years old to use Campometric. If you are under 18, please ensure you have parental consent.",
       errorKey: "consent_terms",
+      required: true,
+    },
+    {
+      id: "public_profile" as const,
+      label: "I agree to make my performance data visible to scouts, agents, and clubs on the Campometric platform and leaderboard.",
+      description: "Your name, position, team and GPS metrics will be visible to verified scouts and agents. This is optional.",
+      errorKey: "consent_public_profile",
+      required: false,
     },
   ];
 
