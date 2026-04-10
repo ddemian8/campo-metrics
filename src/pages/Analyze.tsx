@@ -126,6 +126,91 @@ function isValidTransfermarkt(url: string): boolean {
   }
 }
 
+// Fuzzy matching utilities
+function removeDiacritics(str: string): string {
+  return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+
+function normalizeNameParts(name: string): string[] {
+  return removeDiacritics(name.trim().toLowerCase()).split(/\s+/).filter(Boolean);
+}
+
+function levenshtein(a: string, b: string): number {
+  const m = a.length, n = b.length;
+  const dp: number[][] = Array.from({ length: m + 1 }, (_, i) => {
+    const row = new Array(n + 1).fill(0);
+    row[0] = i;
+    return row;
+  });
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 1; i <= m; i++)
+    for (let j = 1; j <= n; j++)
+      dp[i][j] = Math.min(
+        dp[i - 1][j] + 1,
+        dp[i][j - 1] + 1,
+        dp[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)
+      );
+  return dp[m][n];
+}
+
+function fuzzyMatchPlayer(targetName: string, candidates: string[]): { index: number; score: number; name: string } | null {
+  if (!candidates.length) return null;
+  const targetParts = normalizeNameParts(targetName);
+  const targetFull = targetParts.join(" ");
+
+  let bestIndex = -1;
+  let bestScore = Infinity;
+
+  candidates.forEach((candidate, idx) => {
+    const candParts = normalizeNameParts(candidate);
+    const candFull = candParts.join(" ");
+
+    // Exact full match
+    if (candFull === targetFull) { bestIndex = idx; bestScore = 0; return; }
+
+    // Try both orderings (first last vs last first)
+    const targetReversed = [...targetParts].reverse().join(" ");
+    const dist1 = levenshtein(targetFull, candFull);
+    const dist2 = levenshtein(targetReversed, candFull);
+    let dist = Math.min(dist1, dist2);
+
+    // Partial: check if last name matches any part
+    if (dist > 2) {
+      for (const tp of targetParts) {
+        for (const cp of candParts) {
+          const partDist = levenshtein(tp, cp);
+          if (partDist <= 1) { dist = Math.min(dist, partDist + 1); break; }
+        }
+      }
+    }
+
+    if (dist < bestScore) { bestScore = dist; bestIndex = idx; }
+  });
+
+  if (bestIndex === -1) return null;
+  // Threshold: allow up to 40% of name length as distance
+  const maxAllowed = Math.max(3, Math.floor(targetFull.length * 0.4));
+  return { index: bestIndex, score: bestScore, name: candidates[bestIndex] };
+}
+
+interface ExtractedPlayer {
+  athlete_name: string;
+  duration?: string | null;
+  distance?: number | null;
+  max_sp?: number | null;
+  av_sp?: number | null;
+  sp_ev?: number | null;
+  hmld?: number | null;
+  dist_sp_z4?: number | null;
+  dist_sp_z4plus?: number | null;
+  dist_sp_z5?: number | null;
+  acc_ev?: number | null;
+  dec_ev?: number | null;
+  minutes_played?: number | null;
+}
+
+type PlayerMatchPhase = null | "confirm" | "select";
+
 const Analyze = () => {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
@@ -137,6 +222,12 @@ const Analyze = () => {
   const [extractionError, setExtractionError] = useState<string | null>(null);
   const sessionIdRef = useRef<string>("");
   const [reportReady, setReportReady] = useState(false);
+
+  // Player matching state
+  const [playerMatchPhase, setPlayerMatchPhase] = useState<PlayerMatchPhase>(null);
+  const [extractedPlayers, setExtractedPlayers] = useState<ExtractedPlayer[]>([]);
+  const [matchedPlayerIndex, setMatchedPlayerIndex] = useState<number>(-1);
+  const [platformDetected, setPlatformDetected] = useState<string>("unknown");
 
   const todayDay = String(now.getDate()).padStart(2, "0");
   const todayMonth = String(now.getMonth() + 1);
@@ -236,16 +327,12 @@ const Analyze = () => {
     return () => timers.forEach(clearTimeout);
   }, [isLoading]);
 
-  // Navigate when report is ready AND loading animation has progressed enough
+  // When report is ready, ensure loading steps complete then show button
   useEffect(() => {
     if (!reportReady || !isLoading) return;
-    // Ensure at least the last loading step is shown briefly
-    const minDelay = setTimeout(() => {
-      setLoadingStep(7);
-      setTimeout(() => navigate(`/report/${sessionIdRef.current}`), 800);
-    }, 500);
-    return () => clearTimeout(minDelay);
-  }, [reportReady, isLoading, navigate]);
+    const timer = setTimeout(() => setLoadingStep(7), 500);
+    return () => clearTimeout(timer);
+  }, [reportReady, isLoading]);
 
   // Calculate DOB and age when dropdowns change
   useEffect(() => {
@@ -399,91 +486,35 @@ const Analyze = () => {
     });
   };
 
-  const handleSubmit = async () => {
-    if (!validateStep(7)) return;
-    setIsLoading(true);
-    setExtractionError(null);
+  // Build GPS metrics from a selected player object
+  const buildGpsFromPlayer = (player: ExtractedPlayer, method: string): Record<string, any> => ({
+    duration: player.duration || null,
+    distance: player.distance || null,
+    acc_ev: player.acc_ev || null,
+    dec_ev: player.dec_ev || null,
+    dist_sp_z4: player.dist_sp_z4 || null,
+    dist_sp_z4plus: player.dist_sp_z4plus || null,
+    dist_sp_z5: player.dist_sp_z5 || null,
+    max_sp: player.max_sp || null,
+    av_sp: player.av_sp || null,
+    sp_ev: player.sp_ev || null,
+    hmld: player.hmld || null,
+    athlete_name: player.athlete_name || null,
+    platform_detected: platformDetected,
+    extraction_method: method,
+  });
 
+  // Continue submission with already-resolved GPS data
+  const continueWithGps = async (gpsMetrics: Record<string, any>) => {
+    setIsLoading(true);
+    setPlayerMatchPhase(null);
     try {
       const sessionId = crypto.randomUUID();
       sessionIdRef.current = sessionId;
       const { firstName, lastName } = splitName(form.fullName);
-
-      let gpsMetrics: Record<string, any> = {};
-
-      // For PDF or screenshot, extract GPS data from the file first
-      if ((form.entryMethod === "pdf" || form.entryMethod === "screenshot") && form.gpsFile) {
-        try {
-          const base64 = await fileToBase64(form.gpsFile);
-          const { data: extractResult, error: extractError } = await supabase.functions.invoke("extract-gps-data", {
-            body: {
-              fileBase64: base64,
-              fileType: form.entryMethod,
-              mimeType: form.gpsFile.type,
-            },
-          });
-
-          if (extractError || !extractResult?.success) {
-            // Extraction failed — redirect to manual entry with data preserved
-            setIsLoading(false);
-            setExtractionError(
-              "We couldn't read your file automatically. Please enter your data manually instead."
-            );
-            updateForm({ entryMethod: "manual" });
-            return;
-          }
-
-          // Map extracted data to our GPS metrics format
-          const ext = extractResult.data;
-          gpsMetrics = {
-            duration: ext.duration || null,
-            distance: ext.distance || null,
-            acc_ev: ext.acc_ev || null,
-            dec_ev: ext.dec_ev || null,
-            dist_sp_z4: ext.dist_sp_z4 || null,
-            dist_sp_z4plus: ext.dist_sp_z4plus || null,
-            dist_sp_z5: ext.dist_sp_z5 || null,
-            max_sp: ext.max_sp || null,
-            av_sp: ext.av_sp || null,
-            sp_ev: ext.sp_ev || null,
-            hmld: ext.hmld || null,
-            athlete_name: ext.athlete_name || null,
-            platform_detected: ext.platform_detected || null,
-            extraction_method: form.entryMethod,
-            metrics_found: extractResult.metricsFound,
-          };
-        } catch (err) {
-          console.error("File extraction error:", err);
-          setIsLoading(false);
-          setExtractionError(
-            "We couldn't read your file automatically. Please enter your data manually instead."
-          );
-          updateForm({ entryMethod: "manual" });
-          return;
-        }
-      } else {
-        // Manual entry
-        gpsMetrics = {
-          duration: form.manualData.duration || null,
-          distance: form.manualData.distance ? parseFloat(form.manualData.distance) : null,
-          acc_ev: form.manualData.acc_ev ? parseFloat(form.manualData.acc_ev) : null,
-          dec_ev: form.manualData.dec_ev ? parseFloat(form.manualData.dec_ev) : null,
-          dist_sp_z4: form.manualData.dist_sp_z4 ? parseFloat(form.manualData.dist_sp_z4) : null,
-          dist_sp_z4plus: form.manualData.dist_sp_z4plus ? parseFloat(form.manualData.dist_sp_z4plus) : null,
-          dist_sp_z5: form.manualData.dist_sp_z5 ? parseFloat(form.manualData.dist_sp_z5) : null,
-          max_sp: form.manualData.max_sp ? parseFloat(form.manualData.max_sp) : null,
-          av_sp: form.manualData.av_sp ? parseFloat(form.manualData.av_sp) : null,
-          sp_ev: form.manualData.sp_ev ? parseFloat(form.manualData.sp_ev) : null,
-          hmld: form.manualData.hmld ? parseFloat(form.manualData.hmld) : null,
-          athlete_name: form.manualData.athlete_name || null,
-          extraction_method: "manual",
-        };
-      }
-
       const anonymousToken = crypto.randomUUID();
       localStorage.setItem(`report_token_${sessionId}`, anonymousToken);
 
-      // Save session first
       await supabase.from('anonymous_sessions').insert({
         id: sessionId,
         anonymous_token: anonymousToken,
@@ -518,7 +549,6 @@ const Analyze = () => {
         status: 'processing',
       } as any);
 
-      // Call generate-report edge function
       const { data: reportData, error: reportError } = await supabase.functions.invoke('generate-report', {
         body: {
           playerData: {
@@ -551,18 +581,101 @@ const Analyze = () => {
         return;
       }
 
-      // Save the AI report to the anonymous session
       await supabase.from('anonymous_sessions').update({
         ai_report: reportData.report,
         status: 'completed',
       } as any).eq('id', sessionId);
 
       setReportReady(true);
-
     } catch (err) {
       console.error('Error in submission:', err);
       setIsLoading(false);
       setExtractionError('Something went wrong. Please try again.');
+    }
+  };
+
+  const handlePlayerConfirm = (playerIndex: number) => {
+    const player = extractedPlayers[playerIndex];
+    if (!player) return;
+    const gps = buildGpsFromPlayer(player, form.entryMethod || "pdf");
+    continueWithGps(gps);
+  };
+
+  const handleSubmit = async () => {
+    if (!validateStep(7)) return;
+    setExtractionError(null);
+
+    if ((form.entryMethod === "pdf" || form.entryMethod === "screenshot") && form.gpsFile) {
+      setIsLoading(true);
+      try {
+        const base64 = await fileToBase64(form.gpsFile);
+        const { data: extractResult, error: extractError } = await supabase.functions.invoke("extract-gps-data", {
+          body: {
+            fileBase64: base64,
+            fileType: form.entryMethod,
+            mimeType: form.gpsFile.type,
+          },
+        });
+
+        if (extractError || !extractResult?.success) {
+          setIsLoading(false);
+          setExtractionError("We couldn't read your file automatically. Please enter your data manually instead.");
+          updateForm({ entryMethod: "manual" });
+          return;
+        }
+
+        const players: ExtractedPlayer[] = extractResult.players || [];
+        setPlatformDetected(extractResult.platform_detected || "unknown");
+
+        if (players.length === 0) {
+          setIsLoading(false);
+          setExtractionError("No player data found in the file. Please enter your data manually.");
+          updateForm({ entryMethod: "manual" });
+          return;
+        }
+
+        if (players.length === 1) {
+          const gps = buildGpsFromPlayer(players[0], form.entryMethod || "pdf");
+          await continueWithGps(gps);
+          return;
+        }
+
+        // Multi-player → fuzzy match
+        setIsLoading(false);
+        setExtractedPlayers(players);
+        const names = players.map(p => p.athlete_name || "Unknown");
+        const match = fuzzyMatchPlayer(form.fullName, names);
+
+        if (match && match.score <= 3) {
+          setMatchedPlayerIndex(match.index);
+          setPlayerMatchPhase("confirm");
+        } else {
+          setMatchedPlayerIndex(-1);
+          setPlayerMatchPhase("select");
+        }
+      } catch (err) {
+        console.error("File extraction error:", err);
+        setIsLoading(false);
+        setExtractionError("We couldn't read your file automatically. Please enter your data manually instead.");
+        updateForm({ entryMethod: "manual" });
+      }
+    } else {
+      const gpsMetrics = {
+        duration: form.manualData.duration || null,
+        distance: form.manualData.distance ? parseFloat(form.manualData.distance) : null,
+        acc_ev: form.manualData.acc_ev ? parseFloat(form.manualData.acc_ev) : null,
+        dec_ev: form.manualData.dec_ev ? parseFloat(form.manualData.dec_ev) : null,
+        dist_sp_z4: form.manualData.dist_sp_z4 ? parseFloat(form.manualData.dist_sp_z4) : null,
+        dist_sp_z4plus: form.manualData.dist_sp_z4plus ? parseFloat(form.manualData.dist_sp_z4plus) : null,
+        dist_sp_z5: form.manualData.dist_sp_z5 ? parseFloat(form.manualData.dist_sp_z5) : null,
+        max_sp: form.manualData.max_sp ? parseFloat(form.manualData.max_sp) : null,
+        av_sp: form.manualData.av_sp ? parseFloat(form.manualData.av_sp) : null,
+        sp_ev: form.manualData.sp_ev ? parseFloat(form.manualData.sp_ev) : null,
+        hmld: form.manualData.hmld ? parseFloat(form.manualData.hmld) : null,
+        athlete_name: form.manualData.athlete_name || null,
+        extraction_method: "manual",
+      };
+      await continueWithGps(gpsMetrics);
     }
   };
 
@@ -722,6 +835,130 @@ const Analyze = () => {
     );
   };
 
+  // Player confirmation/selection screen
+  if (playerMatchPhase === "confirm" && extractedPlayers.length > 0) {
+    const player = extractedPlayers[matchedPlayerIndex];
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4">
+        <div className="mb-8">
+          <span className="text-2xl font-bold tracking-tight">
+            <span className="text-foreground">Campo</span>
+            <span className="text-primary">metric</span>
+          </span>
+        </div>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="w-full max-w-md"
+        >
+          <div className="rounded-xl border border-border bg-card p-6 space-y-5">
+            <div className="text-center">
+              <Sparkles className="h-8 w-8 text-primary mx-auto mb-2" />
+              <h2 className="text-xl font-bold text-foreground">We found your data</h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                From {extractedPlayers.length} players in the PDF
+              </p>
+            </div>
+
+            <div className="rounded-lg bg-primary/10 border border-primary/30 p-4">
+              <p className="text-sm font-semibold text-primary mb-3">{player?.athlete_name}</p>
+              <div className="grid grid-cols-3 gap-3 text-center">
+                <div>
+                  <p className="text-xs text-muted-foreground">Distance</p>
+                  <p className="text-sm font-bold text-foreground">
+                    {player?.distance ? `${(player.distance / 1000).toFixed(1)} km` : "N/A"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Max Speed</p>
+                  <p className="text-sm font-bold text-foreground">
+                    {player?.max_sp ? `${player.max_sp.toFixed(1)} km/h` : "N/A"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Duration</p>
+                  <p className="text-sm font-bold text-foreground">
+                    {player?.duration || "N/A"}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <Button
+              onClick={() => handlePlayerConfirm(matchedPlayerIndex)}
+              className="w-full bg-[#1D9E75] hover:bg-[#178a64] text-white font-semibold h-12 text-base"
+            >
+              Generate report →
+            </Button>
+
+            <button
+              onClick={() => setPlayerMatchPhase("select")}
+              className="w-full text-sm text-muted-foreground hover:text-foreground transition-colors text-center"
+            >
+              Not me — pick another player
+            </button>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
+
+  if (playerMatchPhase === "select" && extractedPlayers.length > 0) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4 py-12">
+        <div className="mb-8">
+          <span className="text-2xl font-bold tracking-tight">
+            <span className="text-foreground">Campo</span>
+            <span className="text-primary">metric</span>
+          </span>
+        </div>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="w-full max-w-lg"
+        >
+          <div className="rounded-xl border border-border bg-card p-6 space-y-4">
+            <div className="text-center mb-2">
+              <h2 className="text-xl font-bold text-foreground">We found these players in your PDF</h2>
+              <p className="text-sm text-muted-foreground mt-1">Select your name to continue</p>
+            </div>
+
+            <div className="max-h-80 overflow-y-auto space-y-2 pr-1">
+              {extractedPlayers.map((player, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => handlePlayerConfirm(idx)}
+                  className="w-full text-left rounded-lg border border-border bg-background hover:border-primary hover:bg-primary/5 p-3 transition-colors"
+                >
+                  <p className="font-medium text-foreground text-sm">{player.athlete_name || "Unknown"}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {player.distance ? `${(player.distance / 1000).toFixed(1)} km` : "—"}
+                    {player.max_sp ? ` · ${player.max_sp.toFixed(1)} km/h` : ""}
+                    {player.duration ? ` · ${player.duration}` : ""}
+                  </p>
+                </button>
+              ))}
+            </div>
+
+            <div className="pt-2 border-t border-border">
+              <button
+                onClick={() => {
+                  setPlayerMatchPhase(null);
+                  setExtractedPlayers([]);
+                  updateForm({ entryMethod: "manual" });
+                  setExtractionError("Please enter your data manually instead.");
+                }}
+                className="w-full text-sm text-muted-foreground hover:text-foreground transition-colors text-center py-2"
+              >
+                Enter data manually instead
+              </button>
+            </div>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
+
   // Loading screen
   if (isLoading) {
     const lines = [
@@ -733,6 +970,7 @@ const Analyze = () => {
       "Writing your AI performance narrative...",
       "Your report is ready.",
     ];
+    const allDone = loadingStep >= 7 && reportReady;
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4">
         <div className="mb-12">
@@ -741,53 +979,75 @@ const Analyze = () => {
             <span className="text-primary">metric</span>
           </span>
         </div>
-        <div className="space-y-4 w-full max-w-md">
-          {lines.map((line, i) => {
-            const isActive = loadingStep === i;
-            const isDone = loadingStep > i;
-            const isVisible = loadingStep >= i;
-            const isLast = i === lines.length - 1;
-            if (!isVisible) return null;
-            return (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className={cn(
-                  "flex items-center gap-3 text-base",
-                  isLast && isDone ? "text-[#1db954] font-bold" : isDone ? "text-muted-foreground" : "text-foreground"
-                )}
-              >
-                {isDone ? (
-                  <Check className="h-5 w-5 text-[#1db954] shrink-0" />
-                ) : isActive ? (
-                  <Loader2 className="h-5 w-5 text-primary animate-spin shrink-0" />
-                ) : null}
-                <span>{line}</span>
-              </motion.div>
-            );
-          })}
-        </div>
-        {reportReady && sessionIdRef.current && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mt-8"
-          >
-            <Button
-              onClick={() => navigate(`/report/${sessionIdRef.current}`)}
-              className="bg-[hsl(157,68%,37%)] hover:bg-[hsl(157,68%,30%)] text-white font-medium h-12 px-8 text-base"
+
+        <AnimatePresence mode="wait">
+          {!allDone ? (
+            <motion.div
+              key="steps"
+              initial={{ opacity: 1 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.4 }}
+              className="space-y-4 w-full max-w-md"
             >
-              View your report →
-            </Button>
-          </motion.div>
-        )}
+              {lines.map((line, i) => {
+                const isActive = loadingStep === i;
+                const isDone = loadingStep > i;
+                const isVisible = loadingStep >= i;
+                const isLast = i === lines.length - 1;
+                if (!isVisible) return null;
+                return (
+                  <motion.div
+                    key={i}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className={cn(
+                      "flex items-center gap-3 text-base",
+                      isLast && isDone ? "text-[#1db954] font-bold" : isDone ? "text-muted-foreground" : "text-foreground"
+                    )}
+                  >
+                    {isDone ? (
+                      <Check className="h-5 w-5 text-[#1db954] shrink-0" />
+                    ) : isActive ? (
+                      <Loader2 className="h-5 w-5 text-primary animate-spin shrink-0" />
+                    ) : null}
+                    <span>{line}</span>
+                  </motion.div>
+                );
+              })}
+            </motion.div>
+          ) : (
+            <motion.div
+              key="ready"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.5, ease: "easeOut" }}
+              className="flex flex-col items-center gap-6"
+            >
+              <div className="flex items-center gap-2 text-[#1db954]">
+                <Check className="h-6 w-6" />
+                <span className="text-xl font-bold">Your report is ready</span>
+              </div>
+              <motion.div
+                animate={{ boxShadow: ["0 0 0 0 rgba(29,158,117,0.4)", "0 0 0 16px rgba(29,158,117,0)", "0 0 0 0 rgba(29,158,117,0)"] }}
+                transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+              >
+                <Button
+                  onClick={() => navigate(`/report/${sessionIdRef.current}`)}
+                  className="bg-[#1D9E75] hover:bg-[#178a64] text-white font-semibold h-14 px-10 text-lg rounded-xl"
+                >
+                  View your report →
+                </Button>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         <div className="absolute bottom-0 left-0 right-0 h-1 bg-muted">
           <motion.div
             className="h-full bg-primary"
             initial={{ width: "0%" }}
-            animate={{ width: "100%" }}
-            transition={{ duration: 7, ease: "linear" }}
+            animate={{ width: allDone ? "100%" : `${(loadingStep / 7) * 100}%` }}
+            transition={{ duration: 0.5, ease: "linear" }}
           />
         </div>
       </div>
