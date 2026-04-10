@@ -126,6 +126,91 @@ function isValidTransfermarkt(url: string): boolean {
   }
 }
 
+// Fuzzy matching utilities
+function removeDiacritics(str: string): string {
+  return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+
+function normalizeNameParts(name: string): string[] {
+  return removeDiacritics(name.trim().toLowerCase()).split(/\s+/).filter(Boolean);
+}
+
+function levenshtein(a: string, b: string): number {
+  const m = a.length, n = b.length;
+  const dp: number[][] = Array.from({ length: m + 1 }, (_, i) => {
+    const row = new Array(n + 1).fill(0);
+    row[0] = i;
+    return row;
+  });
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 1; i <= m; i++)
+    for (let j = 1; j <= n; j++)
+      dp[i][j] = Math.min(
+        dp[i - 1][j] + 1,
+        dp[i][j - 1] + 1,
+        dp[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)
+      );
+  return dp[m][n];
+}
+
+function fuzzyMatchPlayer(targetName: string, candidates: string[]): { index: number; score: number; name: string } | null {
+  if (!candidates.length) return null;
+  const targetParts = normalizeNameParts(targetName);
+  const targetFull = targetParts.join(" ");
+
+  let bestIndex = -1;
+  let bestScore = Infinity;
+
+  candidates.forEach((candidate, idx) => {
+    const candParts = normalizeNameParts(candidate);
+    const candFull = candParts.join(" ");
+
+    // Exact full match
+    if (candFull === targetFull) { bestIndex = idx; bestScore = 0; return; }
+
+    // Try both orderings (first last vs last first)
+    const targetReversed = [...targetParts].reverse().join(" ");
+    const dist1 = levenshtein(targetFull, candFull);
+    const dist2 = levenshtein(targetReversed, candFull);
+    let dist = Math.min(dist1, dist2);
+
+    // Partial: check if last name matches any part
+    if (dist > 2) {
+      for (const tp of targetParts) {
+        for (const cp of candParts) {
+          const partDist = levenshtein(tp, cp);
+          if (partDist <= 1) { dist = Math.min(dist, partDist + 1); break; }
+        }
+      }
+    }
+
+    if (dist < bestScore) { bestScore = dist; bestIndex = idx; }
+  });
+
+  if (bestIndex === -1) return null;
+  // Threshold: allow up to 40% of name length as distance
+  const maxAllowed = Math.max(3, Math.floor(targetFull.length * 0.4));
+  return { index: bestIndex, score: bestScore, name: candidates[bestIndex] };
+}
+
+interface ExtractedPlayer {
+  athlete_name: string;
+  duration?: string | null;
+  distance?: number | null;
+  max_sp?: number | null;
+  av_sp?: number | null;
+  sp_ev?: number | null;
+  hmld?: number | null;
+  dist_sp_z4?: number | null;
+  dist_sp_z4plus?: number | null;
+  dist_sp_z5?: number | null;
+  acc_ev?: number | null;
+  dec_ev?: number | null;
+  minutes_played?: number | null;
+}
+
+type PlayerMatchPhase = null | "confirm" | "select";
+
 const Analyze = () => {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
@@ -137,6 +222,12 @@ const Analyze = () => {
   const [extractionError, setExtractionError] = useState<string | null>(null);
   const sessionIdRef = useRef<string>("");
   const [reportReady, setReportReady] = useState(false);
+
+  // Player matching state
+  const [playerMatchPhase, setPlayerMatchPhase] = useState<PlayerMatchPhase>(null);
+  const [extractedPlayers, setExtractedPlayers] = useState<ExtractedPlayer[]>([]);
+  const [matchedPlayerIndex, setMatchedPlayerIndex] = useState<number>(-1);
+  const [platformDetected, setPlatformDetected] = useState<string>("unknown");
 
   const todayDay = String(now.getDate()).padStart(2, "0");
   const todayMonth = String(now.getMonth() + 1);
