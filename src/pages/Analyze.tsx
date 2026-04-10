@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Upload, Image, Keyboard, Shield, Crosshair, Swords, Goal, ChevronLeft, Check, Loader2, FileText, Info, AlertTriangle, Sparkles, HelpCircle, Lock } from "lucide-react";
@@ -58,7 +58,7 @@ interface FormState {
   dob_day: string;
   dob_month: string;
   dob_year: string;
-  date_of_birth: string; // YYYY-MM-DD
+  date_of_birth: string;
   age_calculated: number | null;
   height_cm: string;
   weight_kg: string;
@@ -73,7 +73,7 @@ interface FormState {
   session_day: string;
   session_month: string;
   session_year: string;
-  sessionDate: string; // YYYY-MM-DD
+  sessionDate: string;
   gpsFile: File | null;
   manualData: {
     duration: string;
@@ -101,8 +101,6 @@ const stepVariants = {
   center: { opacity: 1, y: 0 },
   exit: { opacity: 0, y: -20 },
 };
-
-const STEP_PROGRESS = [14, 28, 42, 57, 71, 85, 100];
 
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
@@ -165,16 +163,13 @@ function fuzzyMatchPlayer(targetName: string, candidates: string[]): { index: nu
     const candParts = normalizeNameParts(candidate);
     const candFull = candParts.join(" ");
 
-    // Exact full match
     if (candFull === targetFull) { bestIndex = idx; bestScore = 0; return; }
 
-    // Try both orderings (first last vs last first)
     const targetReversed = [...targetParts].reverse().join(" ");
     const dist1 = levenshtein(targetFull, candFull);
     const dist2 = levenshtein(targetReversed, candFull);
     let dist = Math.min(dist1, dist2);
 
-    // Partial: check if last name matches any part
     if (dist > 2) {
       for (const tp of targetParts) {
         for (const cp of candParts) {
@@ -188,8 +183,6 @@ function fuzzyMatchPlayer(targetName: string, candidates: string[]): { index: nu
   });
 
   if (bestIndex === -1) return null;
-  // Threshold: allow up to 40% of name length as distance
-  const maxAllowed = Math.max(3, Math.floor(targetFull.length * 0.4));
   return { index: bestIndex, score: bestScore, name: candidates[bestIndex] };
 }
 
@@ -211,6 +204,16 @@ interface ExtractedPlayer {
 
 type PlayerMatchPhase = null | "confirm" | "select";
 
+// Determine which profile fields are missing
+function getMissingProfileSteps(profile: any): string[] {
+  const missing: string[] = [];
+  if (!profile?.full_name?.trim() || profile.full_name.trim().split(/\s+/).length < 2) missing.push("name");
+  if (!profile?.date_of_birth || !profile?.height_cm) missing.push("bio");
+  if (!profile?.position || !profile?.position_specific) missing.push("position");
+  if (!profile?.current_club || !profile?.current_league) missing.push("team");
+  return missing;
+}
+
 const Analyze = () => {
   const navigate = useNavigate();
   const [authChecking, setAuthChecking] = useState(true);
@@ -225,7 +228,7 @@ const Analyze = () => {
   const [dragOver, setDragOver] = useState(false);
   const [extractionError, setExtractionError] = useState<string | null>(null);
   const sessionIdRef = useRef<string>("");
-  const [reportReady, setReportReady] = useState(false);
+  const [generationError, setGenerationError] = useState<string | null>(null);
 
   // Player matching state
   const [playerMatchPhase, setPlayerMatchPhase] = useState<PlayerMatchPhase>(null);
@@ -284,7 +287,7 @@ const Analyze = () => {
     },
   });
 
-  // Auth gate: check if user is logged in and has reports remaining
+  // Auth gate
   useEffect(() => {
     const checkAuth = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -299,16 +302,65 @@ const Analyze = () => {
         .eq("user_id", session.user.id)
         .maybeSingle();
       setProfile(profileData);
+
+      // Pre-fill form from profile
       if (profileData) {
         const isPaid = profileData.subscription_plan !== "free" || profileData.account_type !== "free";
         if (!isPaid && (profileData.reports_used_this_month || 0) >= 3) {
           setLimitReached(true);
         }
+
+        // Pre-fill profile data into form
+        setForm(prev => ({
+          ...prev,
+          fullName: profileData.full_name || prev.fullName,
+          transfermarkt_url: profileData.transfermarkt_url || prev.transfermarkt_url,
+          height_cm: profileData.height_cm ? String(profileData.height_cm) : prev.height_cm,
+          weight_kg: profileData.weight_kg ? String(profileData.weight_kg) : prev.weight_kg,
+          position: (profileData.position as PositionZone) || prev.position,
+          positionSpecific: (profileData.position_specific as PositionSpecific) || prev.positionSpecific,
+          teamName: profileData.current_club || prev.teamName,
+          league: profileData.current_league || prev.league,
+          country: profileData.country || prev.country,
+          ...(profileData.date_of_birth ? (() => {
+            const [y, m, d] = profileData.date_of_birth.split("-");
+            const dateObj = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
+            return {
+              dob_day: d,
+              dob_month: String(parseInt(m)),
+              dob_year: y,
+              date_of_birth: profileData.date_of_birth,
+              age_calculated: differenceInYears(new Date(), dateObj),
+            };
+          })() : {}),
+        }));
       }
       setAuthChecking(false);
     };
     checkAuth();
   }, [navigate]);
+
+  // Compute dynamic steps based on profile completeness
+  const missingProfileSteps = useMemo(() => {
+    if (!profile) return ["name", "bio", "position", "team"];
+    return getMissingProfileSteps(profile);
+  }, [profile]);
+
+  // Build the actual step sequence
+  // Always: input_method, session_info, gps_data, consent
+  // Conditionally: name, bio, position, team (only if missing from profile)
+  const stepSequence = useMemo(() => {
+    const steps: string[] = ["input_method"];
+    if (missingProfileSteps.includes("name")) steps.push("name");
+    if (missingProfileSteps.includes("bio")) steps.push("bio");
+    if (missingProfileSteps.includes("position")) steps.push("position");
+    if (missingProfileSteps.includes("team")) steps.push("team");
+    steps.push("session_info", "gps_data");
+    return steps;
+  }, [missingProfileSteps]);
+
+  const totalSteps = stepSequence.length;
+  const currentStepId = stepSequence[step - 1] || "input_method";
 
   const updateConsent = useCallback((field: keyof FormState['consent'], value: boolean) => {
     setForm((prev) => ({
@@ -339,30 +391,33 @@ const Analyze = () => {
     });
   }, []);
 
-  const goNext = useCallback(() => setStep((s) => Math.min(s + 1, 7)), []);
+  const goNext = useCallback(() => setStep((s) => Math.min(s + 1, totalSteps)), [totalSteps]);
   const goBack = useCallback(() => setStep((s) => Math.max(s - 1, 1)), []);
 
-  // Auto-focus name input on step 2
+  // Auto-focus name input
   useEffect(() => {
-    if (step === 2) setTimeout(() => nameRef.current?.focus(), 300);
-  }, [step]);
+    if (currentStepId === "name") setTimeout(() => nameRef.current?.focus(), 300);
+  }, [currentStepId]);
 
-  // Loading sequence
+  // Loading animation sequence - timed steps that keep going
   useEffect(() => {
     if (!isLoading) return;
+    setLoadingStep(0);
+    const steps = [
+      { delay: 100 },   // step 0 → 1
+      { delay: 2000 },  // step 1 → 2
+      { delay: 4000 },  // step 2 → 3
+      { delay: 6000 },  // step 3 → 4
+      { delay: 8000 },  // step 4 → 5
+      { delay: 15000 }, // step 5 → 6 "Almost there..."
+      { delay: 20000 }, // step 6 → 7 "Finalizing..."
+    ];
     const timers: NodeJS.Timeout[] = [];
-    for (let i = 1; i <= 7; i++) {
-      timers.push(setTimeout(() => setLoadingStep(i), i * 1200));
-    }
+    steps.forEach((s, i) => {
+      timers.push(setTimeout(() => setLoadingStep(i + 1), s.delay));
+    });
     return () => timers.forEach(clearTimeout);
   }, [isLoading]);
-
-  // When report is ready, ensure loading steps complete then show button
-  useEffect(() => {
-    if (!reportReady || !isLoading) return;
-    const timer = setTimeout(() => setLoadingStep(7), 500);
-    return () => clearTimeout(timer);
-  }, [reportReady, isLoading]);
 
   // Calculate DOB and age when dropdowns change
   useEffect(() => {
@@ -394,33 +449,19 @@ const Analyze = () => {
 
   const fetchTransfermarkt = useCallback(async (url: string) => {
     if (!url || !isValidTransfermarkt(url)) return;
-
     setForm(prev => ({ ...prev, transfermarkt_status: "loading" }));
-
     try {
       const { data, error } = await supabase.functions.invoke('fetch-transfermarkt', {
         body: { url },
       });
-
       if (error || !data?.success) {
-        setForm(prev => ({
-          ...prev,
-          transfermarkt_status: "error",
-          transfermarkt_data: { ...prev.transfermarkt_data, fetched: false },
-        }));
+        setForm(prev => ({ ...prev, transfermarkt_status: "error", transfermarkt_data: { ...prev.transfermarkt_data, fetched: false } }));
         return;
       }
-
       setForm(prev => ({
         ...prev,
         transfermarkt_status: "success",
-        transfermarkt_data: {
-          club: data.club,
-          league: data.league,
-          nationality: data.nationality,
-          market_value: data.market_value,
-          fetched: true,
-        },
+        transfermarkt_data: { club: data.club, league: data.league, nationality: data.nationality, market_value: data.market_value, fetched: true },
         teamName: data.club || prev.teamName,
         league: data.league || prev.league,
       }));
@@ -431,30 +472,26 @@ const Analyze = () => {
 
   const splitName = (fullName: string) => {
     const parts = fullName.trim().split(/\s+/);
-    const firstName = parts[0] || "";
-    const lastName = parts.slice(1).join(" ") || "";
-    return { firstName, lastName };
+    return { firstName: parts[0] || "", lastName: parts.slice(1).join(" ") || "" };
   };
 
-  const validateStep = (s: number): boolean => {
+  const validateStep = (stepId: string): boolean => {
     const e: Record<string, string> = {};
-    if (s === 2) {
+    if (stepId === "name") {
       if (!form.fullName.trim()) e.name = "Please enter your full name";
       else if (form.fullName.trim().split(/\s+/).length < 2) e.name = "Please enter both your first and last name";
       else if (!/^[\p{L}\s'-]+$/u.test(form.fullName.trim())) e.name = "Name can only contain letters";
       if (form.transfermarkt_url && !isValidTransfermarkt(form.transfermarkt_url))
-        e.transfermarkt = "Please paste a valid Transfermarkt profile link (any country domain is accepted)";
+        e.transfermarkt = "Please paste a valid Transfermarkt profile link";
     }
-    if (s === 3) {
+    if (stepId === "bio") {
       if (!form.dob_day || !form.dob_month || !form.dob_year) e.dob = "Required";
       else {
-        const m = parseInt(form.dob_month);
-        const d = parseInt(form.dob_day);
-        const y = parseInt(form.dob_year);
+        const m = parseInt(form.dob_month), d = parseInt(form.dob_day), y = parseInt(form.dob_year);
         const maxD = getDaysInMonth(m, y);
-        if (d > maxD) e.dob = "This date doesn't exist — please check the day";
+        if (d > maxD) e.dob = "This date doesn't exist";
         else if (form.age_calculated !== null) {
-          if (form.age_calculated < 14) e.dob = "You must be at least 14 years old to use Campometric";
+          if (form.age_calculated < 14) e.dob = "You must be at least 14 years old";
           else if (form.age_calculated > 50) e.dob = "Please check your date of birth";
         }
       }
@@ -462,29 +499,29 @@ const Analyze = () => {
       else {
         const h = parseFloat(form.height_cm);
         if (isNaN(h)) e.height = "Please enter a valid number in cm";
-        else if (h < 150) e.height = "Minimum height is 150 cm — please check your entry";
-        else if (h > 210) e.height = "Maximum height is 210 cm — please check your entry";
+        else if (h < 150) e.height = "Minimum height is 150 cm";
+        else if (h > 210) e.height = "Maximum height is 210 cm";
       }
       if (form.weight_kg) {
         const w = parseFloat(form.weight_kg);
         if (isNaN(w)) e.weight = "Please enter a valid number in kg";
-        else if (w < 50) e.weight = "Minimum weight is 50 kg — please check your entry";
-        else if (w > 120) e.weight = "Maximum weight is 120 kg — please check your entry";
+        else if (w < 50) e.weight = "Minimum weight is 50 kg";
+        else if (w > 120) e.weight = "Maximum weight is 120 kg";
       }
     }
-    if (s === 5) {
+    if (stepId === "team") {
       if (!form.teamName.trim()) e.team = "Required";
       if (!form.league.trim()) e.league = "Required";
     }
-    if (s === 6) {
+    if (stepId === "session_info") {
       if (!form.sessionType) e.sessionType = "Required";
       if (form.sessionType === "training" && form.mdDay === "MD0") e.mdDay = "Please select an MD day";
       if (!form.session_day || !form.session_month || !form.session_year) e.sessionDate = "Required";
     }
-    if (s === 7) {
+    if (stepId === "gps_data") {
       if (form.entryMethod === "manual") {
         if (!form.manualData.duration) e.duration = "Required";
-        else if (!/^\d{1,3}:\d{2}$/.test(form.manualData.duration)) e.duration = "Please use mm:ss format (e.g. 08:24)";
+        else if (!/^\d{1,3}:\d{2}$/.test(form.manualData.duration)) e.duration = "Please use mm:ss format";
         if (!form.manualData.distance) e.distance = "Required";
         if (!form.manualData.max_sp) e.max_sp = "Required";
         if (!form.manualData.sp_ev) e.sp_ev = "Required";
@@ -497,26 +534,18 @@ const Analyze = () => {
   };
 
   const handleContinue = useCallback(() => {
-    if (validateStep(step)) goNext();
-  }, [step, form]);
-
-
+    if (validateStep(currentStepId)) goNext();
+  }, [currentStepId, form]);
 
   const fileToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
-      reader.onload = () => {
-        const result = reader.result as string;
-        // Remove the data:...;base64, prefix
-        const base64 = result.split(",")[1];
-        resolve(base64);
-      };
+      reader.onload = () => resolve((reader.result as string).split(",")[1]);
       reader.onerror = reject;
       reader.readAsDataURL(file);
     });
   };
 
-  // Build GPS metrics from a selected player object
   const buildGpsFromPlayer = (player: ExtractedPlayer, method: string): Record<string, any> => ({
     duration: player.duration || null,
     distance: player.distance || null,
@@ -534,13 +563,14 @@ const Analyze = () => {
     extraction_method: method,
   });
 
-  // Continue submission with already-resolved GPS data
+  // Single generation flow: submit → loading → auto-redirect
   const continueWithGps = async (gpsMetrics: Record<string, any>) => {
     setIsLoading(true);
+    setGenerationError(null);
     setPlayerMatchPhase(null);
     try {
       if (!authUser || !profile) {
-        setExtractionError("You must be logged in.");
+        setGenerationError("You must be logged in.");
         setIsLoading(false);
         return;
       }
@@ -549,7 +579,11 @@ const Analyze = () => {
       sessionIdRef.current = sessionId;
       const { firstName, lastName } = splitName(form.fullName);
 
-      // Insert into sessions table (authenticated)
+      // Use profile data for fields not in form (already pre-filled)
+      const fullName = form.fullName || profile.full_name || "";
+      const position = form.position || profile.position;
+      const positionSpecific = form.positionSpecific || profile.position_specific;
+
       const { error: sessErr } = await supabase.from('sessions').insert({
         id: sessionId,
         player_id: profile.id,
@@ -558,22 +592,20 @@ const Analyze = () => {
         training_day: form.mdDay || null,
         input_method: form.entryMethod === 'pdf' ? 'pdf_upload' : (form.entryMethod || 'manual'),
         opponent: form.opponent || null,
-        position_specific: form.positionSpecific || null,
+        position_specific: positionSpecific || null,
         gps_data: {
-          position_zone: form.position || null,
-          position_specific: form.positionSpecific || null,
-          first_name: firstName,
-          last_name: lastName,
-          date_of_birth: form.date_of_birth || null,
+          position_zone: position || null,
+          position_specific: positionSpecific || null,
+          first_name: firstName || fullName.split(" ")[0],
+          last_name: lastName || fullName.split(" ").slice(1).join(" "),
+          date_of_birth: form.date_of_birth || profile.date_of_birth || null,
           age_calculated: form.age_calculated,
-          height_cm: form.height_cm ? parseInt(form.height_cm) : null,
-          weight_kg: form.weight_kg ? parseInt(form.weight_kg) : null,
-          team_name: form.teamName || null,
-          league: form.league || null,
-          country: form.country || null,
-          transfermarkt_url: form.transfermarkt_url || null,
-          transfermarkt_club: form.transfermarkt_data.club,
-          transfermarkt_league: form.transfermarkt_data.league,
+          height_cm: form.height_cm ? parseInt(form.height_cm) : profile.height_cm,
+          weight_kg: form.weight_kg ? parseInt(form.weight_kg) : profile.weight_kg,
+          team_name: form.teamName || profile.current_club || null,
+          league: form.league || profile.current_league || null,
+          country: form.country || profile.country || null,
+          transfermarkt_url: form.transfermarkt_url || profile.transfermarkt_url || null,
           ...gpsMetrics,
         },
         status: 'processing',
@@ -582,17 +614,17 @@ const Analyze = () => {
       if (sessErr) {
         console.error('Session insert error:', sessErr);
         setIsLoading(false);
-        setExtractionError('Failed to save session. Please try again.');
+        setGenerationError('Failed to save session. Please try again.');
         return;
       }
 
-      // Call generate-report
+      // Call generate-report — this is the ONLY generation call
       const { data: reportData, error: reportError } = await supabase.functions.invoke('generate-report', {
         body: {
           playerData: {
-            fullName: form.fullName,
-            position: form.position,
-            positionSpecific: form.positionSpecific,
+            fullName: fullName,
+            position: position,
+            positionSpecific: positionSpecific,
             sessionType: form.sessionType,
             mdDay: form.mdDay,
             opponent: form.opponent,
@@ -615,14 +647,12 @@ const Analyze = () => {
       if (reportError || !reportData?.success) {
         console.error('Report generation failed:', reportError, reportData);
         setIsLoading(false);
-        setExtractionError('Report generation failed. Please try again.');
+        setGenerationError('Something went wrong generating your report. Please try again.');
         return;
       }
 
-      // Determine if report should be public
       const isPaid = profile.subscription_plan !== 'free' || profile.account_type !== 'free';
 
-      // Insert into reports table
       await supabase.from('reports').insert({
         session_id: sessionId,
         player_id: profile.id,
@@ -631,9 +661,6 @@ const Analyze = () => {
         model_used: reportData.model || 'claude',
       });
 
-      // Update session status
-      await supabase.from('sessions').update({ status: 'completed' } as any).eq('id', sessionId);
-
       // Increment reports_used_this_month for free users
       if (!isPaid) {
         await supabase.from('profiles').update({
@@ -641,36 +668,61 @@ const Analyze = () => {
         }).eq('id', profile.id);
       }
 
-      // Store the report ID for navigation (use session ID as lookup)
-      setReportReady(true);
+      // Save profile data if this was a first-time user with missing fields
+      if (missingProfileSteps.length > 0) {
+        const profileUpdates: {
+          full_name?: string;
+          date_of_birth?: string;
+          height_cm?: number;
+          weight_kg?: number;
+          position?: string;
+          position_specific?: string;
+          current_club?: string;
+          current_league?: string;
+          country?: string;
+          transfermarkt_url?: string;
+        } = {};
+        if (!profile.full_name && form.fullName) profileUpdates.full_name = form.fullName;
+        if (!profile.date_of_birth && form.date_of_birth) profileUpdates.date_of_birth = form.date_of_birth;
+        if (!profile.height_cm && form.height_cm) profileUpdates.height_cm = parseInt(form.height_cm);
+        if (!profile.weight_kg && form.weight_kg) profileUpdates.weight_kg = parseFloat(form.weight_kg);
+        if (!profile.position && form.position) profileUpdates.position = form.position;
+        if (!profile.position_specific && form.positionSpecific) profileUpdates.position_specific = form.positionSpecific;
+        if (!profile.current_club && form.teamName) profileUpdates.current_club = form.teamName;
+        if (!profile.current_league && form.league) profileUpdates.current_league = form.league;
+        if (!profile.country && form.country) profileUpdates.country = form.country;
+        if (!profile.transfermarkt_url && form.transfermarkt_url) profileUpdates.transfermarkt_url = form.transfermarkt_url;
+        if (Object.keys(profileUpdates).length > 0) {
+          await supabase.from('profiles').update(profileUpdates).eq('id', profile.id);
+        }
+      }
+
+      // IMMEDIATELY redirect to report page — no intermediate screen
+      navigate(`/report/${sessionId}`, { replace: true });
     } catch (err) {
       console.error('Error in submission:', err);
       setIsLoading(false);
-      setExtractionError('Something went wrong. Please try again.');
+      setGenerationError('Something went wrong. Please try again.');
     }
   };
 
   const handlePlayerConfirm = (playerIndex: number) => {
     const player = extractedPlayers[playerIndex];
     if (!player) return;
-    const gps = buildGpsFromPlayer(player, form.entryMethod || "pdf");
-    continueWithGps(gps);
+    continueWithGps(buildGpsFromPlayer(player, form.entryMethod || "pdf"));
   };
 
   const handleSubmit = async () => {
-    if (!validateStep(7)) return;
+    if (!validateStep("gps_data")) return;
     setExtractionError(null);
+    setGenerationError(null);
 
     if ((form.entryMethod === "pdf" || form.entryMethod === "screenshot") && form.gpsFile) {
       setIsLoading(true);
       try {
         const base64 = await fileToBase64(form.gpsFile);
         const { data: extractResult, error: extractError } = await supabase.functions.invoke("extract-gps-data", {
-          body: {
-            fileBase64: base64,
-            fileType: form.entryMethod,
-            mimeType: form.gpsFile.type,
-          },
+          body: { fileBase64: base64, fileType: form.entryMethod, mimeType: form.gpsFile.type },
         });
 
         if (extractError || !extractResult?.success) {
@@ -691,8 +743,7 @@ const Analyze = () => {
         }
 
         if (players.length === 1) {
-          const gps = buildGpsFromPlayer(players[0], form.entryMethod || "pdf");
-          await continueWithGps(gps);
+          await continueWithGps(buildGpsFromPlayer(players[0], form.entryMethod || "pdf"));
           return;
         }
 
@@ -735,6 +786,14 @@ const Analyze = () => {
     }
   };
 
+  const retrySubmit = () => {
+    setGenerationError(null);
+    if (sessionIdRef.current) {
+      // Re-attempt with same data
+      handleSubmit();
+    }
+  };
+
   const consentCheckboxes = [
     {
       id: "terms" as const,
@@ -761,7 +820,7 @@ const Analyze = () => {
       <div className="flex items-start gap-3 rounded-lg border-l-[3px] border-primary bg-[#0d2a4a] p-3 mb-5">
         <Shield className="h-4 w-4 text-primary shrink-0 mt-0.5" />
         <p className="text-[11px] text-[#a8c0e0] leading-relaxed">
-          Your data is protected. Campometric stores your information securely and never sells your personal data to third parties. You can withdraw consent and delete your data at any time from your account settings.
+          Your data is protected. Campometric stores your information securely and never sells your personal data to third parties.
         </p>
       </div>
       <div className="space-y-3.5">
@@ -810,7 +869,7 @@ const Analyze = () => {
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") {
       e.preventDefault();
-      if (step === 7) handleSubmit();
+      if (currentStepId === "gps_data") handleSubmit();
       else handleContinue();
     }
   };
@@ -827,7 +886,6 @@ const Analyze = () => {
     if (file) updateForm({ gpsFile: file });
   };
 
-  // Render 3-part date picker
   const renderDateDropdowns = (
     dayKey: "dob_day" | "session_day",
     monthKey: "dob_month" | "session_month",
@@ -839,11 +897,7 @@ const Analyze = () => {
     const dayVal = form[dayKey];
     const monthVal = form[monthKey];
     const yearVal = form[yearKey];
-
-    const maxDays = getDaysInMonth(
-      monthVal ? parseInt(monthVal) : 0,
-      yearVal ? parseInt(yearVal) : currentYear
-    );
+    const maxDays = getDaysInMonth(monthVal ? parseInt(monthVal) : 0, yearVal ? parseInt(yearVal) : currentYear);
 
     return (
       <div>
@@ -855,9 +909,7 @@ const Analyze = () => {
             </SelectTrigger>
             <SelectContent>
               {Array.from({ length: maxDays }, (_, i) => i + 1).map((d) => (
-                <SelectItem key={d} value={String(d).padStart(2, "0")}>
-                  {String(d).padStart(2, "0")}
-                </SelectItem>
+                <SelectItem key={d} value={String(d).padStart(2, "0")}>{String(d).padStart(2, "0")}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -867,9 +919,7 @@ const Analyze = () => {
             </SelectTrigger>
             <SelectContent>
               {MONTHS.map((m, i) => (
-                <SelectItem key={i} value={String(i + 1)}>
-                  {m}
-                </SelectItem>
+                <SelectItem key={i} value={String(i + 1)}>{m}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -879,9 +929,7 @@ const Analyze = () => {
             </SelectTrigger>
             <SelectContent>
               {Array.from({ length: yearRange[1] - yearRange[0] + 1 }, (_, i) => yearRange[1] - i).map((y) => (
-                <SelectItem key={y} value={String(y)}>
-                  {y}
-                </SelectItem>
+                <SelectItem key={y} value={String(y)}>{y}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -890,6 +938,15 @@ const Analyze = () => {
       </div>
     );
   };
+
+  const mdPills: { value: MDDay; label: string }[] = [
+    { value: "MD-3", label: "MD-3" },
+    { value: "MD-2", label: "MD-2" },
+    { value: "MD-1", label: "MD-1" },
+    { value: "MD+1", label: "MD+1" },
+    { value: "MD+2", label: "MD+2" },
+    { value: "MD+3", label: "MD+3" },
+  ];
 
   // Auth checking screen
   if (authChecking) {
@@ -930,7 +987,7 @@ const Analyze = () => {
     );
   }
 
-  // Player confirmation/selection screen
+  // Player confirmation screen
   if (playerMatchPhase === "confirm" && extractedPlayers.length > 0) {
     const player = extractedPlayers[matchedPlayerIndex];
     return (
@@ -941,53 +998,25 @@ const Analyze = () => {
             <span className="text-primary">metric</span>
           </span>
         </div>
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="w-full max-w-md"
-        >
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-lg">
           <div className="rounded-xl border border-border bg-card p-6 space-y-5">
             <div className="text-center">
-              <Sparkles className="h-8 w-8 text-primary mx-auto mb-2" />
               <h2 className="text-xl font-bold text-foreground">We found your data</h2>
-              <p className="text-sm text-muted-foreground mt-1">
-                From {extractedPlayers.length} players in the PDF
-              </p>
+              <p className="text-sm text-muted-foreground mt-1">Confirm this is you</p>
             </div>
-
-            <div className="rounded-lg bg-primary/10 border border-primary/30 p-4">
-              <p className="text-sm font-semibold text-primary mb-3">{player?.athlete_name}</p>
-              <div className="grid grid-cols-3 gap-3 text-center">
-                <div>
-                  <p className="text-xs text-muted-foreground">Distance</p>
-                  <p className="text-sm font-bold text-foreground">
-                    {player?.distance ? `${(player.distance / 1000).toFixed(1)} km` : "N/A"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Max Speed</p>
-                  <p className="text-sm font-bold text-foreground">
-                    {player?.max_sp ? `${player.max_sp.toFixed(1)} km/h` : "N/A"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Duration</p>
-                  <p className="text-sm font-bold text-foreground">
-                    {player?.duration || "N/A"}
-                  </p>
-                </div>
+            <div className="rounded-lg bg-primary/10 border border-primary/30 p-4 text-center">
+              <p className="font-bold text-foreground text-lg">{player?.athlete_name || "Unknown"}</p>
+              <div className="flex justify-center gap-4 mt-2 text-sm text-muted-foreground">
+                {player?.distance && <span>{(player.distance / 1000).toFixed(1)} km</span>}
+                {player?.max_sp && <span>{player.max_sp.toFixed(1)} km/h</span>}
+                {player?.duration && <span>{player.duration}</span>}
               </div>
             </div>
-
-            <Button
-              onClick={() => handlePlayerConfirm(matchedPlayerIndex)}
-              className="w-full bg-[#1D9E75] hover:bg-[#178a64] text-white font-semibold h-12 text-base"
-            >
+            <Button onClick={() => handlePlayerConfirm(matchedPlayerIndex)} className="w-full h-12 bg-[#1D9E75] hover:bg-[#178a64] text-white font-semibold">
               Generate report →
             </Button>
-
             <button
-              onClick={() => setPlayerMatchPhase("select")}
+              onClick={() => { setPlayerMatchPhase("select"); setMatchedPlayerIndex(-1); }}
               className="w-full text-sm text-muted-foreground hover:text-foreground transition-colors text-center"
             >
               Not me — pick another player
@@ -998,6 +1027,7 @@ const Analyze = () => {
     );
   }
 
+  // Player selection screen
   if (playerMatchPhase === "select" && extractedPlayers.length > 0) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4 py-12">
@@ -1007,17 +1037,12 @@ const Analyze = () => {
             <span className="text-primary">metric</span>
           </span>
         </div>
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="w-full max-w-lg"
-        >
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-lg">
           <div className="rounded-xl border border-border bg-card p-6 space-y-4">
             <div className="text-center mb-2">
               <h2 className="text-xl font-bold text-foreground">We found these players in your PDF</h2>
               <p className="text-sm text-muted-foreground mt-1">Select your name to continue</p>
             </div>
-
             <div className="max-h-80 overflow-y-auto space-y-2 pr-1">
               {extractedPlayers.map((player, idx) => (
                 <button
@@ -1034,7 +1059,6 @@ const Analyze = () => {
                 </button>
               ))}
             </div>
-
             <div className="pt-2 border-t border-border">
               <button
                 onClick={() => {
@@ -1054,18 +1078,18 @@ const Analyze = () => {
     );
   }
 
-  // Loading screen
+  // Loading screen — single flow, auto-redirects when done
   if (isLoading) {
     const lines = [
       "Reading your GPS data...",
-      "Identifying your session metrics...",
-      "Normalising to 90 minutes...",
-      "Comparing with position benchmarks...",
-      "Building your player profile...",
-      "Writing your AI performance narrative...",
-      "Your report is ready.",
+      "Finding your player data...",
+      "Analyzing sprint patterns...",
+      "Comparing to position benchmarks...",
+      "Generating personalized insights...",
+      "Almost there...",
+      "Finalizing your report...",
     ];
-    const allDone = loadingStep >= 7 && reportReady;
+
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4">
         <div className="mb-12">
@@ -1075,73 +1099,38 @@ const Analyze = () => {
           </span>
         </div>
 
-        <AnimatePresence mode="wait">
-          {!allDone ? (
-            <motion.div
-              key="steps"
-              initial={{ opacity: 1 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.4 }}
-              className="space-y-4 w-full max-w-md"
-            >
-              {lines.map((line, i) => {
-                const isActive = loadingStep === i;
-                const isDone = loadingStep > i;
-                const isVisible = loadingStep >= i;
-                const isLast = i === lines.length - 1;
-                if (!isVisible) return null;
-                return (
-                  <motion.div
-                    key={i}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className={cn(
-                      "flex items-center gap-3 text-base",
-                      isLast && isDone ? "text-[#1db954] font-bold" : isDone ? "text-muted-foreground" : "text-foreground"
-                    )}
-                  >
-                    {isDone ? (
-                      <Check className="h-5 w-5 text-[#1db954] shrink-0" />
-                    ) : isActive ? (
-                      <Loader2 className="h-5 w-5 text-primary animate-spin shrink-0" />
-                    ) : null}
-                    <span>{line}</span>
-                  </motion.div>
-                );
-              })}
-            </motion.div>
-          ) : (
-            <motion.div
-              key="ready"
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.5, ease: "easeOut" }}
-              className="flex flex-col items-center gap-6"
-            >
-              <div className="flex items-center gap-2 text-[#1db954]">
-                <Check className="h-6 w-6" />
-                <span className="text-xl font-bold">Your report is ready</span>
-              </div>
+        <div className="space-y-4 w-full max-w-md">
+          {lines.map((line, i) => {
+            const isActive = loadingStep === i + 1;
+            const isDone = loadingStep > i + 1;
+            const isVisible = loadingStep >= i + 1;
+            if (!isVisible) return null;
+            return (
               <motion.div
-                animate={{ boxShadow: ["0 0 0 0 rgba(29,158,117,0.4)", "0 0 0 16px rgba(29,158,117,0)", "0 0 0 0 rgba(29,158,117,0)"] }}
-                transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                key={i}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className={cn(
+                  "flex items-center gap-3 text-base",
+                  isDone ? "text-muted-foreground" : "text-foreground"
+                )}
               >
-                <Button
-                  onClick={() => navigate(`/report/${sessionIdRef.current}`)}
-                  className="bg-[#1D9E75] hover:bg-[#178a64] text-white font-semibold h-14 px-10 text-lg rounded-xl"
-                >
-                  View your report →
-                </Button>
+                {isDone ? (
+                  <Check className="h-5 w-5 text-[#1db954] shrink-0" />
+                ) : isActive ? (
+                  <Loader2 className="h-5 w-5 text-primary animate-spin shrink-0" />
+                ) : null}
+                <span>{line}</span>
               </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+            );
+          })}
+        </div>
 
         <div className="absolute bottom-0 left-0 right-0 h-1 bg-muted">
           <motion.div
             className="h-full bg-primary"
             initial={{ width: "0%" }}
-            animate={{ width: allDone ? "100%" : `${(loadingStep / 7) * 100}%` }}
+            animate={{ width: `${Math.min((loadingStep / 7) * 100, 95)}%` }}
             transition={{ duration: 0.5, ease: "linear" }}
           />
         </div>
@@ -1149,23 +1138,32 @@ const Analyze = () => {
     );
   }
 
-  const mdPills: { value: MDDay; label: string }[] = [
-    { value: "MD-3", label: "MD-3" },
-    { value: "MD-2", label: "MD-2" },
-    { value: "MD-1", label: "MD-1" },
-    { value: "MD+1", label: "MD+1" },
-    { value: "MD+2", label: "MD+2" },
-    { value: "MD+3", label: "MD+3" },
-  ];
+  // Generation error screen
+  if (generationError) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4 text-center">
+        <div className="mb-8">
+          <span className="text-2xl font-bold tracking-tight">
+            <span className="text-foreground">Campo</span>
+            <span className="text-primary">metric</span>
+          </span>
+        </div>
+        <AlertTriangle className="h-12 w-12 text-amber-400 mb-4" />
+        <h1 className="text-xl font-bold text-foreground mb-2">{generationError}</h1>
+        <Button onClick={retrySubmit} className="mt-4 bg-[#1D9E75] hover:bg-[#178a64] text-white font-semibold h-12 px-8">
+          Try again →
+        </Button>
+      </div>
+    );
+  }
+
+  const stepProgress = ((step) / totalSteps) * 100;
 
   return (
     <div className="min-h-screen bg-background flex flex-col" onKeyDown={handleKeyDown}>
       {/* Progress bar */}
       <div className="fixed top-0 left-0 right-0 z-50 h-1 bg-muted">
-        <div
-          className="h-full bg-primary transition-all duration-500 ease-out"
-          style={{ width: `${STEP_PROGRESS[step - 1]}%` }}
-        />
+        <div className="h-full bg-primary transition-all duration-500 ease-out" style={{ width: `${stepProgress}%` }} />
       </div>
 
       {/* Back button + step counter */}
@@ -1177,7 +1175,7 @@ const Analyze = () => {
         ) : (
           <div />
         )}
-        <span className="text-xs text-muted-foreground">Step {step} of 7</span>
+        <span className="text-xs text-muted-foreground">Step {step} of {totalSteps}</span>
       </div>
 
       {/* Steps */}
@@ -1192,8 +1190,8 @@ const Analyze = () => {
             transition={{ duration: 0.2 }}
             className="w-full max-w-2xl mx-auto text-center"
           >
-            {/* STEP 1 */}
-            {step === 1 && (
+            {/* INPUT METHOD */}
+            {currentStepId === "input_method" && (
               <div>
                 <h1 className="text-3xl sm:text-4xl font-bold text-foreground mb-10">
                   How would you like to add your GPS data?
@@ -1229,8 +1227,8 @@ const Analyze = () => {
               </div>
             )}
 
-            {/* STEP 2 — Name + Transfermarkt */}
-            {step === 2 && (
+            {/* NAME (only if missing from profile) */}
+            {currentStepId === "name" && (
               <div>
                 <h1 className="text-3xl sm:text-4xl font-bold text-foreground mb-10">What's your name?</h1>
                 <div className="max-w-md mx-auto">
@@ -1245,29 +1243,21 @@ const Analyze = () => {
                 </div>
                 {errors.name && <p className="text-destructive text-sm mt-3">{errors.name}</p>}
 
-                {/* Transfermarkt field */}
                 <div className="max-w-md mx-auto mt-6 text-left">
                   <div className="flex items-center gap-2 mb-1.5">
                     <label className="text-[13px] font-medium text-foreground">Transfermarkt profile</label>
                     <span className="text-[10px] text-muted-foreground bg-muted/30 px-1.5 py-0.5 rounded-full">Optional</span>
-                    <span className="text-[10px] bg-[#0d3320] text-[#1db954] px-2 py-0.5 rounded-full font-medium">Auto-fill ✓</span>
                   </div>
                   <Input
                     placeholder="https://www.transfermarkt.com/your-name/profil/spieler/..."
                     value={form.transfermarkt_url}
                     onChange={(e) => updateForm({ transfermarkt_url: e.target.value })}
                     onBlur={() => {
-                      if (form.transfermarkt_url && isValidTransfermarkt(form.transfermarkt_url)) {
-                        fetchTransfermarkt(form.transfermarkt_url);
-                      }
+                      if (form.transfermarkt_url && isValidTransfermarkt(form.transfermarkt_url)) fetchTransfermarkt(form.transfermarkt_url);
                     }}
                     className="text-sm h-11 bg-secondary border-border"
                   />
-                  <p className="text-[11px] text-muted-foreground mt-1.5">
-                    Works with all Transfermarkt domains: .com, .de, .it, .ro, .es, .fr, .co.uk and more
-                  </p>
                   {errors.transfermarkt && <p className="text-[11px] text-destructive mt-1">{errors.transfermarkt}</p>}
-
                   {form.transfermarkt_status === "loading" && (
                     <div className="flex items-center gap-2 mt-2 text-[12px] text-muted-foreground">
                       <Loader2 className="h-3 w-3 animate-spin" /> Fetching your profile...
@@ -1276,17 +1266,7 @@ const Analyze = () => {
                   {form.transfermarkt_status === "success" && (
                     <div className="flex items-start gap-2 rounded-lg bg-[#0d3320] border border-[#1db954]/30 p-3 mt-2">
                       <Check className="h-4 w-4 text-[#1db954] shrink-0 mt-0.5" />
-                      <p className="text-[12px] text-[#1db954]">
-                        Profile found! Team and league have been filled in automatically.
-                      </p>
-                    </div>
-                  )}
-                  {form.transfermarkt_status === "error" && (
-                    <div className="flex items-start gap-2 rounded-lg bg-[#2a1f00] border border-amber-500/30 p-3 mt-2">
-                      <AlertTriangle className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
-                      <p className="text-[12px] text-amber-300">
-                        We couldn't find this Transfermarkt profile. You can still continue and fill in your team manually.
-                      </p>
+                      <p className="text-[12px] text-[#1db954]">Profile found! Team and league have been filled in automatically.</p>
                     </div>
                   )}
                 </div>
@@ -1295,30 +1275,18 @@ const Analyze = () => {
               </div>
             )}
 
-            {/* STEP 3 — DOB (3 dropdowns), Height, Weight */}
-            {step === 3 && (
+            {/* BIO (only if missing from profile) */}
+            {currentStepId === "bio" && (
               <div>
-                <h1 className="text-3xl sm:text-4xl font-bold text-foreground mb-10">
-                  Tell us a bit more about you
-                </h1>
+                <h1 className="text-3xl sm:text-4xl font-bold text-foreground mb-10">Tell us a bit more about you</h1>
                 <div className="max-w-xl mx-auto space-y-5 text-left">
-                  {/* DOB dropdowns */}
                   <div className="rounded-lg border border-border/50 bg-[#0d1f35] p-4">
-                    {renderDateDropdowns(
-                      "dob_day", "dob_month", "dob_year",
-                      [currentYear - 50, currentYear - 14],
-                      "Date of birth",
-                      "Used to calculate your age for position benchmarks"
-                    )}
+                    {renderDateDropdowns("dob_day", "dob_month", "dob_year", [currentYear - 50, currentYear - 14], "Date of birth", "Used to calculate your age for position benchmarks")}
                     {form.dob_day && form.dob_month && form.dob_year && form.age_calculated !== null && form.age_calculated >= 14 && form.age_calculated <= 50 && (
-                      <p className="text-[13px] text-[#1db954] font-medium mt-2">
-                        Age: {form.age_calculated} years old
-                      </p>
+                      <p className="text-[13px] text-[#1db954] font-medium mt-2">Age: {form.age_calculated} years old</p>
                     )}
                     {errors.dob && <p className="text-[11px] text-destructive mt-1">{errors.dob}</p>}
                   </div>
-
-                  {/* Height + Weight row */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="rounded-lg border border-border/50 bg-[#0d1f35] p-3.5 focus-within:border-primary transition-all">
                       <div className="flex items-center gap-1.5 mb-0.5">
@@ -1326,39 +1294,17 @@ const Analyze = () => {
                         <span className="text-red-500 text-xs">•</span>
                       </div>
                       <p className="text-[11px] text-muted-foreground mb-2">cm</p>
-                      <input
-                        type="number"
-                        inputMode="numeric"
-                        min={150}
-                        max={210}
-                        placeholder="e.g. 181"
-                        value={form.height_cm}
-                        onChange={(e) => updateForm({ height_cm: e.target.value })}
-                        className="w-full bg-transparent text-foreground text-base outline-none placeholder:text-muted-foreground/40"
-                      />
+                      <input type="number" inputMode="numeric" min={150} max={210} placeholder="e.g. 181" value={form.height_cm} onChange={(e) => updateForm({ height_cm: e.target.value })} className="w-full bg-transparent text-foreground text-base outline-none placeholder:text-muted-foreground/40" />
                       {errors.height && <p className="text-[11px] text-destructive mt-1">{errors.height}</p>}
-                      <p className="text-[11px] text-muted-foreground mt-1">Between 150 cm and 210 cm</p>
                     </div>
-
                     <div className="rounded-lg border border-border/50 bg-[#0d1f35] p-3.5 focus-within:border-primary transition-all">
                       <div className="flex items-center gap-1.5 mb-0.5">
                         <label className="text-[13px] font-medium text-foreground">Weight</label>
                         <span className="text-[10px] text-muted-foreground bg-muted/30 px-1.5 py-0.5 rounded-full">Optional</span>
                       </div>
                       <p className="text-[11px] text-muted-foreground mb-2">kg</p>
-                      <input
-                        type="number"
-                        inputMode="decimal"
-                        min={50}
-                        max={120}
-                        step={0.5}
-                        placeholder="e.g. 75"
-                        value={form.weight_kg}
-                        onChange={(e) => updateForm({ weight_kg: e.target.value })}
-                        className="w-full bg-transparent text-foreground text-base outline-none placeholder:text-muted-foreground/40"
-                      />
+                      <input type="number" inputMode="decimal" min={50} max={120} step={0.5} placeholder="e.g. 75" value={form.weight_kg} onChange={(e) => updateForm({ weight_kg: e.target.value })} className="w-full bg-transparent text-foreground text-base outline-none placeholder:text-muted-foreground/40" />
                       {errors.weight && <p className="text-[11px] text-destructive mt-1">{errors.weight}</p>}
-                      <p className="text-[11px] text-muted-foreground mt-1">Between 50 kg and 120 kg — used only for AI intensity calculations, never shown publicly</p>
                     </div>
                   </div>
                 </div>
@@ -1366,8 +1312,8 @@ const Analyze = () => {
               </div>
             )}
 
-            {/* STEP 4 — Position Zone + Sub-position */}
-            {step === 4 && (
+            {/* POSITION (only if missing from profile) */}
+            {currentStepId === "position" && (
               <div>
                 <h1 className="text-3xl sm:text-4xl font-bold text-foreground mb-10">What position do you play?</h1>
                 <div className="grid grid-cols-2 gap-4 max-w-sm mx-auto">
@@ -1377,47 +1323,20 @@ const Analyze = () => {
                     { id: "MID" as PositionZone, label: "Midfield", icon: Crosshair },
                     { id: "FWD" as PositionZone, label: "Attack", icon: Swords },
                   ]).map((pos) => (
-                    <button
-                      key={pos.id}
-                      onClick={() => {
-                        updateForm({ position: pos.id, positionSpecific: null });
-                      }}
-                      className={cn(
-                        "flex flex-col items-center gap-2 p-6 rounded-xl border-2 transition-all hover:border-primary hover:bg-primary/5",
-                        form.position === pos.id ? "border-[#1D9E75] bg-[#1D9E75]/10" : "border-border"
-                      )}
-                    >
+                    <button key={pos.id} onClick={() => updateForm({ position: pos.id, positionSpecific: null })} className={cn("flex flex-col items-center gap-2 p-6 rounded-xl border-2 transition-all hover:border-primary hover:bg-primary/5", form.position === pos.id ? "border-[#1D9E75] bg-[#1D9E75]/10" : "border-border")}>
                       <pos.icon className="h-8 w-8 text-primary" />
                       <span className="font-semibold text-foreground">{pos.label}</span>
                       <span className="text-xs text-muted-foreground">{pos.id}</span>
                     </button>
                   ))}
                 </div>
-
-                {/* Sub-position row */}
                 <AnimatePresence>
                   {form.position && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: "auto" }}
-                      exit={{ opacity: 0, height: 0 }}
-                      transition={{ duration: 0.3 }}
-                      className="overflow-hidden mt-8"
-                    >
+                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} transition={{ duration: 0.3 }} className="overflow-hidden mt-8">
                       <p className="text-sm text-muted-foreground mb-4">Choose your specific position</p>
                       <div className="flex flex-wrap justify-center gap-3">
                         {SUB_POSITIONS[form.position].map((sub) => (
-                          <button
-                            key={sub.id}
-                            onClick={() => {
-                              updateForm({ positionSpecific: sub.id });
-                              setTimeout(goNext, 500);
-                            }}
-                            className={cn(
-                              "flex flex-col items-center gap-1 px-5 py-3 rounded-lg border-2 transition-all hover:border-[#1D9E75] hover:bg-[#1D9E75]/5 min-w-[90px]",
-                              form.positionSpecific === sub.id ? "border-[#1D9E75] bg-[#1D9E75]/10" : "border-border"
-                            )}
-                          >
+                          <button key={sub.id} onClick={() => { updateForm({ positionSpecific: sub.id }); setTimeout(goNext, 500); }} className={cn("flex flex-col items-center gap-1 px-5 py-3 rounded-lg border-2 transition-all hover:border-[#1D9E75] hover:bg-[#1D9E75]/5 min-w-[90px]", form.positionSpecific === sub.id ? "border-[#1D9E75] bg-[#1D9E75]/10" : "border-border")}>
                             <span className="text-lg font-bold text-foreground">{sub.id}</span>
                             <span className="text-[10px] text-muted-foreground leading-tight">{sub.label}</span>
                           </button>
@@ -1426,106 +1345,44 @@ const Analyze = () => {
                     </motion.div>
                   )}
                 </AnimatePresence>
-
-                <p className="text-xs text-muted-foreground mt-6">
-                  Your position changes the AI benchmarks used in your report
-                </p>
               </div>
             )}
 
-            {/* STEP 5 — Team, League, Country */}
-            {step === 5 && (
+            {/* TEAM (only if missing from profile) */}
+            {currentStepId === "team" && (
               <div>
-                <h1 className="text-3xl sm:text-4xl font-bold text-foreground mb-6">
-                  What team and league do you play in?
-                </h1>
-
-                {form.transfermarkt_data.fetched && (
-                  <div className="flex items-start gap-3 rounded-lg border-l-[3px] border-primary bg-[#0d2a4a] p-3 mb-6 max-w-md mx-auto text-left">
-                    <Sparkles className="h-4 w-4 text-primary shrink-0 mt-0.5" />
-                    <p className="text-[12px] text-[#a8c0e0]">Auto-filled from your Transfermarkt profile</p>
-                  </div>
-                )}
-
+                <h1 className="text-3xl sm:text-4xl font-bold text-foreground mb-6">What team and league do you play in?</h1>
                 <div className="flex flex-col gap-4 max-w-md mx-auto">
                   <div>
-                    {form.transfermarkt_data.fetched && form.teamName && (
-                      <span className="text-[10px] text-[#1db954] bg-[#0d3320] px-2 py-0.5 rounded-full mb-1 inline-block">Auto-filled from Transfermarkt</span>
-                    )}
-                    <div className="relative">
-                      <Input
-                        placeholder="e.g. FC Petrocub, Dacia Buiucani, FC Porto..."
-                        value={form.teamName}
-                        onChange={(e) => updateForm({ teamName: e.target.value })}
-                        className="text-center text-lg h-12 bg-secondary border-border"
-                      />
-                      {form.transfermarkt_data.fetched && form.teamName && (
-                        <div className="absolute right-3 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-[#1db954]" />
-                      )}
-                    </div>
+                    <Input placeholder="e.g. FC Petrocub" value={form.teamName} onChange={(e) => updateForm({ teamName: e.target.value })} className="text-center text-lg h-12 bg-secondary border-border" />
                     {errors.team && <p className="text-destructive text-xs mt-1">{errors.team}</p>}
                   </div>
                   <div>
-                    {form.transfermarkt_data.fetched && form.league && (
-                      <span className="text-[10px] text-[#1db954] bg-[#0d3320] px-2 py-0.5 rounded-full mb-1 inline-block">Auto-filled from Transfermarkt</span>
-                    )}
-                    <div className="relative">
-                      <Input
-                        placeholder="e.g. Divizia Națională, Liga 1, Primeira Liga..."
-                        value={form.league}
-                        onChange={(e) => updateForm({ league: e.target.value })}
-                        className="text-center text-lg h-12 bg-secondary border-border"
-                      />
-                      {form.transfermarkt_data.fetched && form.league && (
-                        <div className="absolute right-3 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-[#1db954]" />
-                      )}
-                    </div>
+                    <Input placeholder="e.g. Divizia Națională" value={form.league} onChange={(e) => updateForm({ league: e.target.value })} className="text-center text-lg h-12 bg-secondary border-border" />
                     {errors.league && <p className="text-destructive text-xs mt-1">{errors.league}</p>}
                   </div>
-
                   <div>
                     <div className="flex items-center gap-2 mb-1">
                       <label className="text-[13px] font-medium text-foreground text-left">Country</label>
                       <span className="text-[10px] text-muted-foreground bg-muted/30 px-1.5 py-0.5 rounded-full">Optional</span>
                     </div>
-                    <Input
-                      placeholder="e.g. Moldova, Romania, Portugal..."
-                      value={form.country}
-                      onChange={(e) => updateForm({ country: e.target.value })}
-                      className="text-center text-lg h-12 bg-secondary border-border"
-                    />
-                    <p className="text-[11px] text-muted-foreground mt-1 text-left">Helps scouts filter players by country on the leaderboard.</p>
+                    <Input placeholder="e.g. Moldova, Romania, Portugal..." value={form.country} onChange={(e) => updateForm({ country: e.target.value })} className="text-center text-lg h-12 bg-secondary border-border" />
                   </div>
                 </div>
                 <Button onClick={handleContinue} className="mt-8 h-12 px-8 text-base">Continue →</Button>
               </div>
             )}
 
-            {/* STEP 6 — Session type with Match/Training logic */}
-            {step === 6 && (
+            {/* SESSION INFO */}
+            {currentStepId === "session_info" && (
               <div>
-                <h1 className="text-3xl sm:text-4xl font-bold text-foreground mb-10">
-                  What type of session is this?
-                </h1>
+                <h1 className="text-3xl sm:text-4xl font-bold text-foreground mb-10">What type of session is this?</h1>
                 <div className="flex gap-4 justify-center mb-6">
                   {([
                     { id: "match" as SessionType, icon: "⚽", title: "Match", sub: "Official or friendly game" },
                     { id: "training" as SessionType, icon: "🏋️", title: "Training", sub: "Practice session" },
                   ]).map((s) => (
-                    <button
-                      key={s.id}
-                      onClick={() => {
-                        if (s.id === "match") {
-                          updateForm({ sessionType: s.id, mdDay: "MD0" });
-                        } else {
-                          updateForm({ sessionType: s.id, mdDay: "MD0" }); // reset, user must pick
-                        }
-                      }}
-                      className={cn(
-                        "flex flex-col items-center gap-2 p-6 px-8 rounded-xl border-2 transition-all hover:border-primary hover:bg-primary/5 min-w-[140px]",
-                        form.sessionType === s.id ? "border-primary bg-primary/5" : "border-border"
-                      )}
-                    >
+                    <button key={s.id} onClick={() => updateForm({ sessionType: s.id, mdDay: "MD0" })} className={cn("flex flex-col items-center gap-2 p-6 px-8 rounded-xl border-2 transition-all hover:border-primary hover:bg-primary/5 min-w-[140px]", form.sessionType === s.id ? "border-primary bg-primary/5" : "border-border")}>
                       <span className="text-3xl">{s.icon}</span>
                       <span className="font-semibold text-foreground">{s.title}</span>
                       <span className="text-xs text-muted-foreground">{s.sub}</span>
@@ -1535,84 +1392,49 @@ const Analyze = () => {
 
                 <AnimatePresence>
                   {form.sessionType && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: "auto" }}
-                      exit={{ opacity: 0, height: 0 }}
-                      transition={{ duration: 0.25 }}
-                      className="overflow-hidden"
-                    >
+                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} transition={{ duration: 0.25 }} className="overflow-hidden">
                       {form.sessionType === "match" && (
                         <div className="space-y-4 max-w-md mx-auto mt-4 text-left">
-                          {renderDateDropdowns(
-                            "session_day", "session_month", "session_year",
-                            [currentYear - 2, currentYear],
-                            "When was the match?"
-                          )}
+                          {renderDateDropdowns("session_day", "session_month", "session_year", [currentYear - 2, currentYear], "When was the match?")}
                           <div>
                             <label className="text-[13px] font-medium text-foreground block mb-1.5">Opponent (optional)</label>
-                            <Input
-                              placeholder="e.g. FC Milsami"
-                              value={form.opponent}
-                              onChange={(e) => updateForm({ opponent: e.target.value })}
-                              className="h-11 bg-[#0d1f35] border-border"
-                            />
+                            <Input placeholder="e.g. FC Milsami" value={form.opponent} onChange={(e) => updateForm({ opponent: e.target.value })} className="h-11 bg-[#0d1f35] border-border" />
                           </div>
                           {errors.sessionDate && <p className="text-[11px] text-destructive">{errors.sessionDate}</p>}
                         </div>
                       )}
-
                       {form.sessionType === "training" && (
                         <div className="space-y-5 max-w-lg mx-auto mt-4 text-left">
-                          {/* MD day selector */}
                           <div>
                             <label className="text-[13px] font-medium text-foreground block mb-2">What type of training session was this?</label>
                             <div className="flex flex-wrap gap-2 justify-center">
                               {mdPills.map((md) => (
-                                <button
-                                  key={md.value}
-                                  onClick={() => updateForm({ mdDay: md.value })}
-                                  className={cn(
-                                    "px-4 py-2 rounded-full text-sm font-medium border transition-all",
-                                    form.mdDay === md.value
-                                      ? "bg-primary text-primary-foreground border-primary"
-                                      : "border-border text-muted-foreground hover:border-primary hover:text-foreground"
-                                  )}
-                                >
+                                <button key={md.value} onClick={() => updateForm({ mdDay: md.value })} className={cn("px-4 py-2 rounded-full text-sm font-medium border transition-all", form.mdDay === md.value ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:border-primary hover:text-foreground")}>
                                   {md.label}
                                 </button>
                               ))}
                             </div>
                             {errors.mdDay && <p className="text-[11px] text-destructive mt-1 text-center">{errors.mdDay}</p>}
                           </div>
-
-                          {/* MD explanation */}
                           <div className="relative rounded-lg border-l-[3px] border-primary bg-[#0d2a4a] p-4">
                             <HelpCircle className="absolute top-3 right-3 h-4 w-4 text-muted-foreground/40" />
                             <p className="text-[12px] font-semibold text-foreground mb-2">What is MD (Match Day)?</p>
                             <div className="text-[11px] text-[#a8c0e0] leading-[1.8] space-y-0.5">
-                              <p>MD stands for "Match Day" — the day of the official match. Training sessions are classified by how many days before or after the match they take place:</p>
+                              <p>MD stands for "Match Day." Training sessions are classified by proximity to the match.</p>
                               <ul className="mt-2 space-y-0.5">
-                                <li><span className="font-bold text-[#7eb8f7]">MD-3</span> — 3 days before the match → high intensity, tactical work</li>
-                                <li><span className="font-bold text-[#7eb8f7]">MD-2</span> — 2 days before the match → moderate intensity, shape work</li>
-                                <li><span className="font-bold text-[#7eb8f7]">MD-1</span> — 1 day before the match → light session, activation only</li>
-                                <li><span className="font-bold text-[#7eb8f7]">MD+1</span> — 1 day after the match → recovery session, very low load</li>
-                                <li><span className="font-bold text-[#7eb8f7]">MD+2</span> — 2 days after the match → return to training, medium load</li>
-                                <li><span className="font-bold text-[#7eb8f7]">MD+3</span> — 3 days after the match → normal training, full intensity</li>
+                                <li><span className="font-bold text-[#7eb8f7]">MD-3</span> — high intensity, tactical</li>
+                                <li><span className="font-bold text-[#7eb8f7]">MD-2</span> — moderate intensity</li>
+                                <li><span className="font-bold text-[#7eb8f7]">MD-1</span> — light session, activation</li>
+                                <li><span className="font-bold text-[#7eb8f7]">MD+1</span> — recovery session</li>
+                                <li><span className="font-bold text-[#7eb8f7]">MD+2</span> — return to training</li>
+                                <li><span className="font-bold text-[#7eb8f7]">MD+3</span> — full intensity</li>
                               </ul>
                             </div>
                           </div>
-
-                          {/* Session date */}
-                          {renderDateDropdowns(
-                            "session_day", "session_month", "session_year",
-                            [currentYear - 1, currentYear],
-                            "Date of this session"
-                          )}
+                          {renderDateDropdowns("session_day", "session_month", "session_year", [currentYear - 1, currentYear], "Date of this session")}
                           {errors.sessionDate && <p className="text-[11px] text-destructive">{errors.sessionDate}</p>}
                         </div>
                       )}
-
                       <Button onClick={handleContinue} className="mt-6 h-12 px-8 text-base">Continue →</Button>
                     </motion.div>
                   )}
@@ -1620,8 +1442,8 @@ const Analyze = () => {
               </div>
             )}
 
-            {/* STEP 7 */}
-            {step === 7 && (
+            {/* GPS DATA + CONSENT */}
+            {currentStepId === "gps_data" && (
               <div>
                 <div className="mb-8">
                   <span className="text-2xl font-bold tracking-tight">
@@ -1635,10 +1457,11 @@ const Analyze = () => {
                     <AlertTriangle className="h-5 w-5 text-amber-400 shrink-0 mt-0.5" />
                     <div>
                       <p className="text-sm text-amber-300 font-medium">{extractionError}</p>
-                      <p className="text-[11px] text-amber-300/70 mt-1">Your other details (name, position, team) have been preserved.</p>
+                      <p className="text-[11px] text-amber-300/70 mt-1">Your other details have been preserved.</p>
                     </div>
                   </div>
                 )}
+
                 {form.entryMethod === "manual" ? (
                   <>
                     <h1 className="text-3xl sm:text-4xl font-bold text-foreground mb-6">Enter your GPS data</h1>
@@ -1646,7 +1469,7 @@ const Analyze = () => {
                     <div className="flex items-start gap-3 rounded-lg border border-primary/30 bg-primary/5 p-3 max-w-2xl mx-auto mb-6 text-left">
                       <Info className="h-4 w-4 text-primary shrink-0 mt-0.5" />
                       <p className="text-xs text-muted-foreground">
-                        You can find these values in your GPS platform export. Column names may vary slightly by platform (STATSports, Catapult, gpexe).
+                        You can find these values in your GPS platform export (STATSports, Catapult, gpexe).
                       </p>
                     </div>
 
@@ -1665,18 +1488,11 @@ const Analyze = () => {
                         { key: "dist_sp_z4plus", label: "Dist / Speed Zone 4+", unit: "m", type: "number", ph: "e.g. 54.0", required: false },
                         { key: "athlete_name", label: "Athlete name", unit: "as shown in GPS file", type: "text", ph: "e.g. Rotaru N.", required: false },
                       ] as const).map((f) => (
-                        <div
-                          key={f.key}
-                          className={cn(
-                            "rounded-lg border border-border/50 bg-[#0d1f35] p-3.5 transition-all focus-within:border-primary"
-                          )}
-                        >
+                        <div key={f.key} className="rounded-lg border border-border/50 bg-[#0d1f35] p-3.5 transition-all focus-within:border-primary">
                           <div className="flex items-center gap-1.5 mb-0.5">
                             <label className="text-[13px] font-medium text-foreground">{f.label}</label>
                             {f.required && <span className="text-red-500 text-xs">•</span>}
-                            {!f.required && (
-                              <span className="text-[10px] text-muted-foreground bg-muted/30 px-1.5 py-0.5 rounded-full">Optional</span>
-                            )}
+                            {!f.required && <span className="text-[10px] text-muted-foreground bg-muted/30 px-1.5 py-0.5 rounded-full">Optional</span>}
                           </div>
                           <p className="text-[11px] text-muted-foreground mb-2">{f.unit}</p>
                           <input
@@ -1689,9 +1505,7 @@ const Analyze = () => {
                             onChange={(e) => updateManual(f.key, e.target.value)}
                             className="w-full bg-transparent text-foreground text-base outline-none placeholder:text-muted-foreground/40"
                           />
-                          {errors[f.key] && (
-                            <p className="text-[11px] text-red-500 mt-1.5">{errors[f.key]}</p>
-                          )}
+                          {errors[f.key] && <p className="text-[11px] text-red-500 mt-1.5">{errors[f.key]}</p>}
                         </div>
                       ))}
                     </div>
@@ -1704,15 +1518,8 @@ const Analyze = () => {
                       const canSubmit = allRequiredFilled && form.consent.terms;
                       return (
                         <>
-                          <Button
-                            onClick={handleSubmit}
-                            disabled={!canSubmit}
-                            className={cn(
-                              "mt-6 h-12 px-8 text-base w-full max-w-2xl",
-                              !canSubmit && "opacity-50 cursor-not-allowed"
-                            )}
-                          >
-                            Generate my report →
+                          <Button onClick={handleSubmit} disabled={!canSubmit} className={cn("mt-6 h-12 px-8 text-base w-full max-w-2xl", !canSubmit && "opacity-50 cursor-not-allowed")}>
+                            Analyse my session →
                           </Button>
                           {!canSubmit && (
                             <p className="text-[11px] text-muted-foreground mt-2 text-center">
@@ -1739,13 +1546,7 @@ const Analyze = () => {
                       )}
                       onClick={() => document.getElementById("file-input")?.click()}
                     >
-                      <input
-                        id="file-input"
-                        type="file"
-                        accept={form.entryMethod === "pdf" ? ".pdf" : ".jpg,.jpeg,.png,.webp"}
-                        className="hidden"
-                        onChange={handleFileSelect}
-                      />
+                      <input id="file-input" type="file" accept={form.entryMethod === "pdf" ? ".pdf" : ".jpg,.jpeg,.png,.webp"} className="hidden" onChange={handleFileSelect} />
                       {form.gpsFile ? (
                         <div className="flex items-center justify-center gap-3">
                           <Check className="h-6 w-6 text-[#1db954]" />
@@ -1754,32 +1555,20 @@ const Analyze = () => {
                       ) : (
                         <div className="flex flex-col items-center gap-3">
                           <FileText className="h-12 w-12 text-muted-foreground" />
-                          <p className="text-foreground font-medium">
-                            {form.entryMethod === "pdf" ? "Drop your GPS PDF here" : "Drop your screenshot here"}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            {form.entryMethod === "pdf"
-                              ? "Works with STATSports, Catapult, gpexe and more"
-                              : "Accepts JPG, PNG, WebP"}
-                          </p>
+                          <p className="text-foreground font-medium">{form.entryMethod === "pdf" ? "Drop your GPS PDF here" : "Drop your screenshot here"}</p>
+                          <p className="text-sm text-muted-foreground">{form.entryMethod === "pdf" ? "Works with STATSports, Catapult, gpexe and more" : "Accepts JPG, PNG, WebP"}</p>
                           <p className="text-xs text-primary">click to browse files</p>
                         </div>
                       )}
                     </div>
+
                     {renderConsentSection()}
 
                     {(() => {
                       const canSubmit = form.gpsFile && form.consent.terms;
                       return (
                         <>
-                          <Button
-                            onClick={handleSubmit}
-                            disabled={!canSubmit}
-                            className={cn(
-                              "mt-6 h-12 px-8 text-base",
-                              !canSubmit && "opacity-50 cursor-not-allowed"
-                            )}
-                          >
+                          <Button onClick={handleSubmit} disabled={!canSubmit} className={cn("mt-6 h-12 px-8 text-base", !canSubmit && "opacity-50 cursor-not-allowed")}>
                             Analyse my session →
                           </Button>
                           {!canSubmit && (
