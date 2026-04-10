@@ -490,7 +490,7 @@ const Analyze = () => {
         session_type: form.sessionType || 'match',
         session_date: form.sessionDate || null,
         training_day: form.mdDay || null,
-        input_method: form.entryMethod || 'manual',
+        input_method: form.entryMethod === 'pdf' ? 'pdf_upload' : (form.entryMethod || 'manual'),
         player_name: form.fullName,
         position: form.position || null,
         opponent: form.opponent || null,
@@ -768,6 +768,20 @@ const Analyze = () => {
             );
           })}
         </div>
+        {reportReady && sessionIdRef.current && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mt-8"
+          >
+            <Button
+              onClick={() => navigate(`/report/${sessionIdRef.current}`)}
+              className="bg-[hsl(157,68%,37%)] hover:bg-[hsl(157,68%,30%)] text-white font-medium h-12 px-8 text-base"
+            >
+              View your report →
+            </Button>
+          </motion.div>
+        )}
         <div className="absolute bottom-0 left-0 right-0 h-1 bg-muted">
           <motion.div
             className="h-full bg-primary"
