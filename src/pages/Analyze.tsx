@@ -311,6 +311,7 @@ const Analyze = () => {
   }, [navigate]);
 
   const updateConsent = useCallback((field: keyof FormState['consent'], value: boolean) => {
+    setForm((prev) => ({
       ...prev,
       consent: { ...prev.consent, [field]: value },
     }));
