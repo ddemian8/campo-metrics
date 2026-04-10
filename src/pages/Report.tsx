@@ -47,6 +47,7 @@ interface GpsData {
   transfermarkt_url?: string;
   transfermarkt_club?: string;
   transfermarkt_league?: string;
+  position_zone?: string;
   duration?: string;
   distance?: number;
   max_sp?: number;
