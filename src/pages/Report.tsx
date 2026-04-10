@@ -100,9 +100,8 @@ const Report = () => {
   useEffect(() => {
     if (!id) return;
 
-    const fetchAndGenerate = async () => {
+    const fetchReport = async () => {
       try {
-        // Fetch session data
         const { data: sessionData, error: fetchError } = await supabase
           .from("anonymous_sessions")
           .select("*")
@@ -128,53 +127,21 @@ const Report = () => {
         };
         setSession(mapped);
 
-        // Generate AI report
-        const { data: reportResult, error: reportError } =
-          await supabase.functions.invoke("generate-report", {
-            body: {
-              playerData: {
-                fullName: sessionData.player_name || `${gps.first_name || ''} ${gps.last_name || ''}`.trim(),
-                age: gps.age_calculated || "unknown",
-                height: gps.height_cm || "unknown",
-                weight: gps.weight_kg || null,
-                position: sessionData.position || "unknown",
-                positionSpecific: (sessionData as any).position_specific || sessionData.position || "unknown",
-                teamName: gps.team_name || "unknown",
-                league: gps.league || "unknown",
-                sessionType: sessionData.session_type || "match",
-                mdDay: sessionData.training_day || "MD0",
-                sessionDate: sessionData.session_date || "unknown",
-                duration: gps.duration || "",
-                distance: gps.distance || "",
-                maxSpeed: gps.max_sp || "",
-                avSpeed: gps.av_sp || "",
-                spEv: gps.sp_ev || "",
-                hmld: gps.hmld || "",
-                distSpZ4: gps.dist_sp_z4 || "",
-                distSpZ4Plus: gps.dist_sp_z4plus || "",
-                distSpZ5: gps.dist_sp_z5 || "",
-                accEv: gps.acc_ev || "",
-                decEv: gps.dec_ev || "",
-              },
-            },
-          });
-
-        if (reportError || !reportResult?.success) {
-          setError("Failed to generate report. Please try again.");
-          setLoading(false);
-          return;
+        // Use the pre-generated AI report from the session
+        if (sessionData.ai_report) {
+          setReport(sessionData.ai_report as unknown as ReportData);
+        } else {
+          setError("Report not yet generated. Please wait and refresh.");
         }
-
-        setReport(reportResult.report);
       } catch (e) {
         console.error("Report error:", e);
-        setError("Something went wrong generating your report.");
+        setError("Something went wrong loading your report.");
       } finally {
         setLoading(false);
       }
     };
 
-    fetchAndGenerate();
+    fetchReport();
   }, [id]);
 
   const handleAuth = async () => {
