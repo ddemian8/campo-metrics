@@ -233,13 +233,19 @@ const Analyze = () => {
     for (let i = 1; i <= 7; i++) {
       timers.push(setTimeout(() => setLoadingStep(i), i * 1200));
     }
-    timers.push(
-      setTimeout(() => {
-        navigate(`/report/${sessionIdRef.current}`);
-      }, 8700)
-    );
     return () => timers.forEach(clearTimeout);
-  }, [isLoading, navigate]);
+  }, [isLoading]);
+
+  // Navigate when report is ready AND loading animation has progressed enough
+  useEffect(() => {
+    if (!reportReady || !isLoading) return;
+    // Ensure at least the last loading step is shown briefly
+    const minDelay = setTimeout(() => {
+      setLoadingStep(7);
+      setTimeout(() => navigate(`/report/${sessionIdRef.current}`), 800);
+    }, 500);
+    return () => clearTimeout(minDelay);
+  }, [reportReady, isLoading, navigate]);
 
   // Calculate DOB and age when dropdowns change
   useEffect(() => {
