@@ -486,91 +486,35 @@ const Analyze = () => {
     });
   };
 
-  const handleSubmit = async () => {
-    if (!validateStep(7)) return;
-    setIsLoading(true);
-    setExtractionError(null);
+  // Build GPS metrics from a selected player object
+  const buildGpsFromPlayer = (player: ExtractedPlayer, method: string): Record<string, any> => ({
+    duration: player.duration || null,
+    distance: player.distance || null,
+    acc_ev: player.acc_ev || null,
+    dec_ev: player.dec_ev || null,
+    dist_sp_z4: player.dist_sp_z4 || null,
+    dist_sp_z4plus: player.dist_sp_z4plus || null,
+    dist_sp_z5: player.dist_sp_z5 || null,
+    max_sp: player.max_sp || null,
+    av_sp: player.av_sp || null,
+    sp_ev: player.sp_ev || null,
+    hmld: player.hmld || null,
+    athlete_name: player.athlete_name || null,
+    platform_detected: platformDetected,
+    extraction_method: method,
+  });
 
+  // Continue submission with already-resolved GPS data
+  const continueWithGps = async (gpsMetrics: Record<string, any>) => {
+    setIsLoading(true);
+    setPlayerMatchPhase(null);
     try {
       const sessionId = crypto.randomUUID();
       sessionIdRef.current = sessionId;
       const { firstName, lastName } = splitName(form.fullName);
-
-      let gpsMetrics: Record<string, any> = {};
-
-      // For PDF or screenshot, extract GPS data from the file first
-      if ((form.entryMethod === "pdf" || form.entryMethod === "screenshot") && form.gpsFile) {
-        try {
-          const base64 = await fileToBase64(form.gpsFile);
-          const { data: extractResult, error: extractError } = await supabase.functions.invoke("extract-gps-data", {
-            body: {
-              fileBase64: base64,
-              fileType: form.entryMethod,
-              mimeType: form.gpsFile.type,
-            },
-          });
-
-          if (extractError || !extractResult?.success) {
-            // Extraction failed — redirect to manual entry with data preserved
-            setIsLoading(false);
-            setExtractionError(
-              "We couldn't read your file automatically. Please enter your data manually instead."
-            );
-            updateForm({ entryMethod: "manual" });
-            return;
-          }
-
-          // Map extracted data to our GPS metrics format
-          const ext = extractResult.data;
-          gpsMetrics = {
-            duration: ext.duration || null,
-            distance: ext.distance || null,
-            acc_ev: ext.acc_ev || null,
-            dec_ev: ext.dec_ev || null,
-            dist_sp_z4: ext.dist_sp_z4 || null,
-            dist_sp_z4plus: ext.dist_sp_z4plus || null,
-            dist_sp_z5: ext.dist_sp_z5 || null,
-            max_sp: ext.max_sp || null,
-            av_sp: ext.av_sp || null,
-            sp_ev: ext.sp_ev || null,
-            hmld: ext.hmld || null,
-            athlete_name: ext.athlete_name || null,
-            platform_detected: ext.platform_detected || null,
-            extraction_method: form.entryMethod,
-            metrics_found: extractResult.metricsFound,
-          };
-        } catch (err) {
-          console.error("File extraction error:", err);
-          setIsLoading(false);
-          setExtractionError(
-            "We couldn't read your file automatically. Please enter your data manually instead."
-          );
-          updateForm({ entryMethod: "manual" });
-          return;
-        }
-      } else {
-        // Manual entry
-        gpsMetrics = {
-          duration: form.manualData.duration || null,
-          distance: form.manualData.distance ? parseFloat(form.manualData.distance) : null,
-          acc_ev: form.manualData.acc_ev ? parseFloat(form.manualData.acc_ev) : null,
-          dec_ev: form.manualData.dec_ev ? parseFloat(form.manualData.dec_ev) : null,
-          dist_sp_z4: form.manualData.dist_sp_z4 ? parseFloat(form.manualData.dist_sp_z4) : null,
-          dist_sp_z4plus: form.manualData.dist_sp_z4plus ? parseFloat(form.manualData.dist_sp_z4plus) : null,
-          dist_sp_z5: form.manualData.dist_sp_z5 ? parseFloat(form.manualData.dist_sp_z5) : null,
-          max_sp: form.manualData.max_sp ? parseFloat(form.manualData.max_sp) : null,
-          av_sp: form.manualData.av_sp ? parseFloat(form.manualData.av_sp) : null,
-          sp_ev: form.manualData.sp_ev ? parseFloat(form.manualData.sp_ev) : null,
-          hmld: form.manualData.hmld ? parseFloat(form.manualData.hmld) : null,
-          athlete_name: form.manualData.athlete_name || null,
-          extraction_method: "manual",
-        };
-      }
-
       const anonymousToken = crypto.randomUUID();
       localStorage.setItem(`report_token_${sessionId}`, anonymousToken);
 
-      // Save session first
       await supabase.from('anonymous_sessions').insert({
         id: sessionId,
         anonymous_token: anonymousToken,
@@ -605,7 +549,6 @@ const Analyze = () => {
         status: 'processing',
       } as any);
 
-      // Call generate-report edge function
       const { data: reportData, error: reportError } = await supabase.functions.invoke('generate-report', {
         body: {
           playerData: {
@@ -638,18 +581,101 @@ const Analyze = () => {
         return;
       }
 
-      // Save the AI report to the anonymous session
       await supabase.from('anonymous_sessions').update({
         ai_report: reportData.report,
         status: 'completed',
       } as any).eq('id', sessionId);
 
       setReportReady(true);
-
     } catch (err) {
       console.error('Error in submission:', err);
       setIsLoading(false);
       setExtractionError('Something went wrong. Please try again.');
+    }
+  };
+
+  const handlePlayerConfirm = (playerIndex: number) => {
+    const player = extractedPlayers[playerIndex];
+    if (!player) return;
+    const gps = buildGpsFromPlayer(player, form.entryMethod || "pdf");
+    continueWithGps(gps);
+  };
+
+  const handleSubmit = async () => {
+    if (!validateStep(7)) return;
+    setExtractionError(null);
+
+    if ((form.entryMethod === "pdf" || form.entryMethod === "screenshot") && form.gpsFile) {
+      setIsLoading(true);
+      try {
+        const base64 = await fileToBase64(form.gpsFile);
+        const { data: extractResult, error: extractError } = await supabase.functions.invoke("extract-gps-data", {
+          body: {
+            fileBase64: base64,
+            fileType: form.entryMethod,
+            mimeType: form.gpsFile.type,
+          },
+        });
+
+        if (extractError || !extractResult?.success) {
+          setIsLoading(false);
+          setExtractionError("We couldn't read your file automatically. Please enter your data manually instead.");
+          updateForm({ entryMethod: "manual" });
+          return;
+        }
+
+        const players: ExtractedPlayer[] = extractResult.players || [];
+        setPlatformDetected(extractResult.platform_detected || "unknown");
+
+        if (players.length === 0) {
+          setIsLoading(false);
+          setExtractionError("No player data found in the file. Please enter your data manually.");
+          updateForm({ entryMethod: "manual" });
+          return;
+        }
+
+        if (players.length === 1) {
+          const gps = buildGpsFromPlayer(players[0], form.entryMethod || "pdf");
+          await continueWithGps(gps);
+          return;
+        }
+
+        // Multi-player → fuzzy match
+        setIsLoading(false);
+        setExtractedPlayers(players);
+        const names = players.map(p => p.athlete_name || "Unknown");
+        const match = fuzzyMatchPlayer(form.fullName, names);
+
+        if (match && match.score <= 3) {
+          setMatchedPlayerIndex(match.index);
+          setPlayerMatchPhase("confirm");
+        } else {
+          setMatchedPlayerIndex(-1);
+          setPlayerMatchPhase("select");
+        }
+      } catch (err) {
+        console.error("File extraction error:", err);
+        setIsLoading(false);
+        setExtractionError("We couldn't read your file automatically. Please enter your data manually instead.");
+        updateForm({ entryMethod: "manual" });
+      }
+    } else {
+      const gpsMetrics = {
+        duration: form.manualData.duration || null,
+        distance: form.manualData.distance ? parseFloat(form.manualData.distance) : null,
+        acc_ev: form.manualData.acc_ev ? parseFloat(form.manualData.acc_ev) : null,
+        dec_ev: form.manualData.dec_ev ? parseFloat(form.manualData.dec_ev) : null,
+        dist_sp_z4: form.manualData.dist_sp_z4 ? parseFloat(form.manualData.dist_sp_z4) : null,
+        dist_sp_z4plus: form.manualData.dist_sp_z4plus ? parseFloat(form.manualData.dist_sp_z4plus) : null,
+        dist_sp_z5: form.manualData.dist_sp_z5 ? parseFloat(form.manualData.dist_sp_z5) : null,
+        max_sp: form.manualData.max_sp ? parseFloat(form.manualData.max_sp) : null,
+        av_sp: form.manualData.av_sp ? parseFloat(form.manualData.av_sp) : null,
+        sp_ev: form.manualData.sp_ev ? parseFloat(form.manualData.sp_ev) : null,
+        hmld: form.manualData.hmld ? parseFloat(form.manualData.hmld) : null,
+        athlete_name: form.manualData.athlete_name || null,
+        extraction_method: "manual",
+      };
+      await continueWithGps(gpsMetrics);
     }
   };
 
