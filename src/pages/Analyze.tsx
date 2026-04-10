@@ -1222,7 +1222,7 @@ const Analyze = () => {
                       <p className="text-[11px] text-amber-300/70 mt-1">Your other details (name, position, team) have been preserved.</p>
                     </div>
                   </div>
-                )
+                )}
                 {form.entryMethod === "manual" ? (
                   <>
                     <h1 className="text-3xl sm:text-4xl font-bold text-foreground mb-6">Enter your GPS data</h1>
