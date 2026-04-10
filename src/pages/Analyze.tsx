@@ -134,6 +134,7 @@ const Analyze = () => {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const nameRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [extractionError, setExtractionError] = useState<string | null>(null);
   const sessionIdRef = useRef<string>("");
 
   const todayDay = String(now.getDate()).padStart(2, "0");
