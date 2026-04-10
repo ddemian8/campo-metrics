@@ -11,60 +11,68 @@ serve(async (req) => {
 
   try {
     const { playerData } = await req.json();
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+    const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
+    if (!ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY is not configured");
 
-    const systemPrompt = `You are a professional football performance analyst. Generate a structured performance report for a footballer based on their GPS session data. 
+    const systemPrompt = `You are an elite football performance analyst working for Campometric, a GPS analytics platform. You analyze player match and training data and produce insightful, motivating, professional reports. You write like a top-tier sports scientist who also understands the player as a human. You are precise, never generic, and always normalize stats to per-90-minute values for fair comparison. You compare the player's output to elite benchmarks for their position. You identify ONE standout strength and ONE clear area for improvement. You finish with one specific, actionable training recommendation for the next session. You ALWAYS respond ONLY in valid JSON, no markdown, no preamble.`;
 
-Write in a clear, professional but motivating tone — like a real performance report a club analyst would write. 
+    const gpsData = JSON.stringify({
+      duration: playerData.duration || null,
+      total_distance_m: playerData.distance || null,
+      max_speed_kmh: playerData.maxSpeed || null,
+      avg_speed_kmh: playerData.avSpeed || null,
+      sprint_events: playerData.spEv || null,
+      hmld_m: playerData.hmld || null,
+      dist_speed_zone_4_m: playerData.distSpZ4 || null,
+      dist_speed_zone_4plus_m: playerData.distSpZ4Plus || null,
+      dist_speed_zone_5_m: playerData.distSpZ5 || null,
+      accelerations: playerData.accEv || null,
+      decelerations: playerData.decEv || null,
+    });
 
-Structure your response as JSON with these exact fields:
+    const userMessage = `Analyze this match/training performance and return a JSON object with this exact structure:
+
 {
-  "performance_score": number (0-100),
-  "score_label": string (e.g. "Strong Performance", "Excellent Output", "Below Average"),
-  "headline": string (one sentence summary, max 15 words),
-  "narrative": string (3-4 sentences, professional analysis of the session),
-  "strengths": array of 2-3 strings (what the player did well),
-  "areas_to_improve": array of 1-2 strings (constructive feedback),
-  "position_ranking_percentile": number (0-100, estimated vs position average),
-  "vs_team_average": string (e.g. "+14% above team average distance" or "-8% below team average sprints"),
-  "md_context_note": string (short note about the MD day context),
-  "next_session_recommendation": string (one sentence recommendation for the next training session)
+  "headline": "A short punchy 6-10 word headline capturing the performance",
+  "executiveSummary": "2-3 sentences summarizing the session in a motivating tone",
+  "performanceScore": <number 0-100>,
+  "keyMetrics": [
+    {"label": "Total Distance", "value": "...", "per90": "...", "benchmark": "...", "rating": "elite|good|average|below"},
+    {"label": "Sprint Distance", "value": "...", "per90": "...", "benchmark": "...", "rating": "..."},
+    {"label": "Top Speed", "value": "...", "per90": "N/A", "benchmark": "...", "rating": "..."},
+    {"label": "High Speed Running", "value": "...", "per90": "...", "benchmark": "...", "rating": "..."},
+    {"label": "Accelerations", "value": "...", "per90": "...", "benchmark": "...", "rating": "..."},
+    {"label": "Decelerations", "value": "...", "per90": "...", "benchmark": "...", "rating": "..."}
+  ],
+  "standoutStrength": {"title": "...", "explanation": "2-3 sentences"},
+  "areaToImprove": {"title": "...", "explanation": "2-3 sentences"},
+  "trainingRecommendation": {"title": "...", "drill": "specific drill name and description", "duration": "e.g. 20 minutes", "intensity": "e.g. 75% max HR"},
+  "positionalContext": "1-2 sentences comparing to elite players in same position",
+  "motivationalClose": "One powerful closing sentence the player will remember"
 }
 
-Return ONLY the JSON. No markdown, no backticks, no explanation.`;
+PLAYER: ${playerData.fullName || 'Unknown'}
+POSITION: ${playerData.position || 'Unknown'}
+SESSION TYPE: ${playerData.sessionType || 'match'}
+TRAINING DAY: ${playerData.mdDay || 'N/A'}
+MATCH: ${playerData.opponent || 'N/A'}
+MINUTES PLAYED: ${playerData.minutesPlayed || playerData.duration || 'N/A'}
+GPS DATA: ${gpsData}
 
-    const userMessage = `Player: ${playerData.fullName}, ${playerData.age} years old, ${playerData.height}cm${playerData.weight ? `, ${playerData.weight}kg` : ''}
-Position: ${playerData.position}
-Team: ${playerData.teamName}, ${playerData.league}
-Session type: ${playerData.sessionType} — ${playerData.mdDay}
-Date: ${playerData.sessionDate}
+Return ONLY the JSON object, nothing else.`;
 
-GPS Data:
-- Duration: ${playerData.duration || 'N/A'}
-- Total distance: ${playerData.distance || 'N/A'}m
-- Max speed: ${playerData.maxSpeed || 'N/A'} km/h
-- Average speed: ${playerData.avSpeed || 'N/A'} km/h
-- Speed events (sprints): ${playerData.spEv || 'N/A'}
-- HMLD (high metabolic load distance): ${playerData.hmld || 'N/A'}m
-- Distance Speed Zone 4: ${playerData.distSpZ4 || 'N/A'}m
-- Distance Speed Zone 4+: ${playerData.distSpZ4Plus || 'N/A'}m
-- Distance Speed Zone 5: ${playerData.distSpZ5 || 'N/A'}m
-- Acceleration events: ${playerData.accEv || 'N/A'}
-- Deceleration events: ${playerData.decEv || 'N/A'}
-
-Generate the performance report JSON as instructed.`;
-
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "x-api-key": ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: "claude-sonnet-4-5-20250514",
+        max_tokens: 2000,
+        system: systemPrompt,
         messages: [
-          { role: "system", content: systemPrompt },
           { role: "user", content: userMessage },
         ],
       }),
@@ -77,26 +85,19 @@ Generate the performance report JSON as instructed.`;
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      if (response.status === 402) {
-        return new Response(JSON.stringify({ error: "AI credits exhausted." }), {
-          status: 402,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
       const t = await response.text();
-      console.error("AI gateway error:", response.status, t);
-      return new Response(JSON.stringify({ error: "AI gateway error" }), {
+      console.error("Anthropic API error:", response.status, t);
+      return new Response(JSON.stringify({ error: "AI API error" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     const aiData = await response.json();
-    const content = aiData.choices?.[0]?.message?.content;
+    const content = aiData.content?.[0]?.text;
 
     let report;
     try {
-      // Strip potential markdown code fences
       const cleaned = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
       report = JSON.parse(cleaned);
     } catch {
