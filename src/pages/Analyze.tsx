@@ -378,7 +378,7 @@ const Analyze = () => {
     if (validateStep(step)) goNext();
   }, [step, form]);
 
-  const [extractionError, setExtractionError] = useState<string | null>(null);
+
 
   const fileToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
