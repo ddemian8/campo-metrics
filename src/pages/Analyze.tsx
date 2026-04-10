@@ -1214,6 +1214,15 @@ const Analyze = () => {
                   </span>
                 </div>
 
+                {extractionError && (
+                  <div className="flex items-start gap-3 rounded-lg border border-amber-500/30 bg-[#2a1f00] p-4 max-w-2xl mx-auto mb-6 text-left">
+                    <AlertTriangle className="h-5 w-5 text-amber-400 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm text-amber-300 font-medium">{extractionError}</p>
+                      <p className="text-[11px] text-amber-300/70 mt-1">Your other details (name, position, team) have been preserved.</p>
+                    </div>
+                  </div>
+                )
                 {form.entryMethod === "manual" ? (
                   <>
                     <h1 className="text-3xl sm:text-4xl font-bold text-foreground mb-6">Enter your GPS data</h1>
