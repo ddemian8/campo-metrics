@@ -399,6 +399,8 @@ const Analyze = () => {
         position_specific: form.positionSpecific || null,
         opponent: form.opponent || null,
         gps_data: {
+          position_zone: form.position || null,
+          position_specific: form.positionSpecific || null,
           first_name: firstName,
           last_name: lastName,
           date_of_birth: form.date_of_birth || null,
