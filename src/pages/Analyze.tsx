@@ -670,7 +670,18 @@ const Analyze = () => {
 
       // Save profile data if this was a first-time user with missing fields
       if (missingProfileSteps.length > 0) {
-        const profileUpdates: Record<string, any> = {};
+        const profileUpdates: {
+          full_name?: string;
+          date_of_birth?: string;
+          height_cm?: number;
+          weight_kg?: number;
+          position?: string;
+          position_specific?: string;
+          current_club?: string;
+          current_league?: string;
+          country?: string;
+          transfermarkt_url?: string;
+        } = {};
         if (!profile.full_name && form.fullName) profileUpdates.full_name = form.fullName;
         if (!profile.date_of_birth && form.date_of_birth) profileUpdates.date_of_birth = form.date_of_birth;
         if (!profile.height_cm && form.height_cm) profileUpdates.height_cm = parseInt(form.height_cm);
