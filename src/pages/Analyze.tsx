@@ -284,7 +284,33 @@ const Analyze = () => {
     },
   });
 
-  const updateConsent = useCallback((field: keyof FormState['consent'], value: boolean) => {
+  // Auth gate: check if user is logged in and has reports remaining
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        navigate("/signup?redirectTo=/analyze", { replace: true });
+        return;
+      }
+      setAuthUser(session.user);
+      const { data: profileData } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("user_id", session.user.id)
+        .maybeSingle();
+      setProfile(profileData);
+      if (profileData) {
+        const isPaid = profileData.subscription_plan !== "free" || profileData.account_type !== "free";
+        if (!isPaid && (profileData.reports_used_this_month || 0) >= 3) {
+          setLimitReached(true);
+        }
+      }
+      setAuthChecking(false);
+    };
+    checkAuth();
+  }, [navigate]);
+
+
     setForm((prev) => ({
       ...prev,
       consent: { ...prev.consent, [field]: value },
