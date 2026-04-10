@@ -107,6 +107,7 @@ const Analyze = () => {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const nameRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
+  const sessionIdRef = useRef<string>("");
 
   const todayDay = String(now.getDate()).padStart(2, "0");
   const todayMonth = String(now.getMonth() + 1);
@@ -354,7 +355,7 @@ const Analyze = () => {
 
     try {
       const sessionId = crypto.randomUUID();
-      const { firstName, lastName } = splitName(form.fullName);
+      sessionIdRef.current = sessionId;
 
       await supabase.from('sessions').insert({
         id: sessionId,
