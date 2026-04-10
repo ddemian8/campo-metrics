@@ -11,9 +11,35 @@ import { format, differenceInYears } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 
 type EntryMethod = "pdf" | "screenshot" | "manual";
-type Position = "GK" | "DEF" | "MID" | "FWD";
+type PositionZone = "GK" | "DEF" | "MID" | "FWD";
+type PositionSpecific = "GK" | "CB" | "RB" | "LB" | "RWB" | "LWB" | "CDM" | "CM" | "CAM" | "RM" | "LM" | "ST" | "SS" | "RW" | "LW" | "CF";
 type SessionType = "match" | "training";
 type MDDay = "MD-3" | "MD-2" | "MD-1" | "MD0" | "MD+1" | "MD+2" | "MD+3";
+
+const SUB_POSITIONS: Record<PositionZone, { id: PositionSpecific; label: string }[]> = {
+  GK: [{ id: "GK", label: "Goalkeeper" }],
+  DEF: [
+    { id: "CB", label: "Central Back" },
+    { id: "RB", label: "Right Back" },
+    { id: "LB", label: "Left Back" },
+    { id: "RWB", label: "Right Wing-back" },
+    { id: "LWB", label: "Left Wing-back" },
+  ],
+  MID: [
+    { id: "CDM", label: "Defensive Mid" },
+    { id: "CM", label: "Central Mid" },
+    { id: "CAM", label: "Attacking Mid" },
+    { id: "RM", label: "Right Mid" },
+    { id: "LM", label: "Left Mid" },
+  ],
+  FWD: [
+    { id: "ST", label: "Striker" },
+    { id: "SS", label: "Second Striker" },
+    { id: "RW", label: "Right Winger" },
+    { id: "LW", label: "Left Winger" },
+    { id: "CF", label: "Centre Forward" },
+  ],
+};
 
 interface TransfermarktData {
   club: string | null;
@@ -36,7 +62,8 @@ interface FormState {
   age_calculated: number | null;
   height_cm: string;
   weight_kg: string;
-  position: Position | null;
+  position: PositionZone | null;
+  positionSpecific: PositionSpecific | null;
   teamName: string;
   league: string;
   country: string;
@@ -127,6 +154,7 @@ const Analyze = () => {
     height_cm: "",
     weight_kg: "",
     position: null,
+    positionSpecific: null,
     teamName: "",
     league: "",
     country: "",
@@ -368,8 +396,11 @@ const Analyze = () => {
         input_method: form.entryMethod || 'manual',
         player_name: form.fullName,
         position: form.position || null,
+        position_specific: form.positionSpecific || null,
         opponent: form.opponent || null,
         gps_data: {
+          position_zone: form.position || null,
+          position_specific: form.positionSpecific || null,
           first_name: firstName,
           last_name: lastName,
           date_of_birth: form.date_of_birth || null,
@@ -841,26 +872,25 @@ const Analyze = () => {
               </div>
             )}
 
-            {/* STEP 4 */}
+            {/* STEP 4 — Position Zone + Sub-position */}
             {step === 4 && (
               <div>
                 <h1 className="text-3xl sm:text-4xl font-bold text-foreground mb-10">What position do you play?</h1>
                 <div className="grid grid-cols-2 gap-4 max-w-sm mx-auto">
                   {([
-                    { id: "GK" as Position, label: "Goalkeeper", icon: Goal },
-                    { id: "DEF" as Position, label: "Defender", icon: Shield },
-                    { id: "MID" as Position, label: "Midfielder", icon: Crosshair },
-                    { id: "FWD" as Position, label: "Forward", icon: Swords },
+                    { id: "GK" as PositionZone, label: "Goalkeeper", icon: Goal },
+                    { id: "DEF" as PositionZone, label: "Defence", icon: Shield },
+                    { id: "MID" as PositionZone, label: "Midfield", icon: Crosshair },
+                    { id: "FWD" as PositionZone, label: "Attack", icon: Swords },
                   ]).map((pos) => (
                     <button
                       key={pos.id}
                       onClick={() => {
-                        updateForm({ position: pos.id });
-                        setTimeout(goNext, 400);
+                        updateForm({ position: pos.id, positionSpecific: null });
                       }}
                       className={cn(
                         "flex flex-col items-center gap-2 p-6 rounded-xl border-2 transition-all hover:border-primary hover:bg-primary/5",
-                        form.position === pos.id ? "border-primary bg-primary/5" : "border-border"
+                        form.position === pos.id ? "border-[#1D9E75] bg-[#1D9E75]/10" : "border-border"
                       )}
                     >
                       <pos.icon className="h-8 w-8 text-primary" />
@@ -869,6 +899,40 @@ const Analyze = () => {
                     </button>
                   ))}
                 </div>
+
+                {/* Sub-position row */}
+                <AnimatePresence>
+                  {form.position && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={{ duration: 0.3 }}
+                      className="overflow-hidden mt-8"
+                    >
+                      <p className="text-sm text-muted-foreground mb-4">Choose your specific position</p>
+                      <div className="flex flex-wrap justify-center gap-3">
+                        {SUB_POSITIONS[form.position].map((sub) => (
+                          <button
+                            key={sub.id}
+                            onClick={() => {
+                              updateForm({ positionSpecific: sub.id });
+                              setTimeout(goNext, 500);
+                            }}
+                            className={cn(
+                              "flex flex-col items-center gap-1 px-5 py-3 rounded-lg border-2 transition-all hover:border-[#1D9E75] hover:bg-[#1D9E75]/5 min-w-[90px]",
+                              form.positionSpecific === sub.id ? "border-[#1D9E75] bg-[#1D9E75]/10" : "border-border"
+                            )}
+                          >
+                            <span className="text-lg font-bold text-foreground">{sub.id}</span>
+                            <span className="text-[10px] text-muted-foreground leading-tight">{sub.label}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
                 <p className="text-xs text-muted-foreground mt-6">
                   Your position changes the AI benchmarks used in your report
                 </p>
