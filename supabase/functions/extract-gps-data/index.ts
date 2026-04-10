@@ -19,8 +19,8 @@ serve(async (req) => {
       });
     }
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+    const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
+    if (!ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY is not configured");
 
     const extractionPrompt = `You are a GPS football performance data extraction specialist. 
 Extract ALL GPS performance metrics you can find from this ${fileType === "pdf" ? "PDF document" : "screenshot/image"}.
@@ -72,37 +72,57 @@ IMPORTANT:
 - If a table has multiple players, try to extract data for ALL visible players and return the FIRST player's data
 - Return ONLY the JSON, no markdown, no explanation`;
 
-    // Use Lovable AI Gateway with Gemini vision model
-    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
-    const response = await fetch(`${SUPABASE_URL}/functions/v1/ai-proxy`, {
+    // Determine the media type for Anthropic's vision API
+    let mediaType = mimeType || "image/png";
+    
+    // For PDFs, Anthropic supports document type
+    const isPdf = fileType === "pdf" || mediaType === "application/pdf";
+    
+    const content: any[] = [{ type: "text", text: extractionPrompt }];
+    
+    if (isPdf) {
+      content.push({
+        type: "document",
+        source: {
+          type: "base64",
+          media_type: "application/pdf",
+          data: fileBase64,
+        },
+      });
+    } else {
+      // Image types
+      if (!["image/jpeg", "image/png", "image/webp", "image/gif"].includes(mediaType)) {
+        mediaType = "image/png";
+      }
+      content.push({
+        type: "image",
+        source: {
+          type: "base64",
+          media_type: mediaType,
+          data: fileBase64,
+        },
+      });
+    }
+
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${LOVABLE_API_KEY}`,
+        "x-api-key": ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          {
-            role: "user",
-            content: [
-              { type: "text", text: extractionPrompt },
-              {
-                type: "image_url",
-                image_url: {
-                  url: `data:${mimeType || "application/octet-stream"};base64,${fileBase64}`,
-                },
-              },
-            ],
-          },
-        ],
+        model: "claude-sonnet-4-5-20250514",
         max_tokens: 1500,
+        messages: [
+          { role: "user", content },
+        ],
       }),
     });
 
     if (!response.ok) {
       const errText = await response.text();
-      console.error("AI extraction error:", response.status, errText);
+      console.error("Anthropic extraction error:", response.status, errText);
       return new Response(JSON.stringify({ success: false, error: "Failed to extract data from file" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -110,9 +130,9 @@ IMPORTANT:
     }
 
     const aiResult = await response.json();
-    const content = aiResult.choices?.[0]?.message?.content;
+    const textContent = aiResult.content?.[0]?.text;
 
-    if (!content) {
+    if (!textContent) {
       return new Response(JSON.stringify({ success: false, error: "No data could be extracted from the file" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -121,10 +141,10 @@ IMPORTANT:
 
     let extracted;
     try {
-      const cleaned = content.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+      const cleaned = textContent.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
       extracted = JSON.parse(cleaned);
     } catch {
-      console.error("Failed to parse extraction result:", content);
+      console.error("Failed to parse extraction result:", textContent);
       return new Response(JSON.stringify({ success: false, error: "Could not parse extracted data" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
