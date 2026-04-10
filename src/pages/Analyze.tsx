@@ -559,6 +559,7 @@ const Analyze = () => {
   // Single generation flow: submit → loading → auto-redirect
   const continueWithGps = async (gpsMetrics: Record<string, any>) => {
     setIsExtracting(false);
+    setPlayerMatchPhase(null);
     setIsGenerating(true);
     setGenerationError(null);
     try {
