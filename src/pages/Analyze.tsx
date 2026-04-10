@@ -1278,8 +1278,7 @@ const Analyze = () => {
                     {(() => {
                       const m = form.manualData;
                       const allRequiredFilled = m.duration && m.distance && m.max_sp && m.sp_ev && m.hmld;
-                      const allConsent = form.consent.public_profile && form.consent.leaderboard && form.consent.terms;
-                      const canSubmit = allRequiredFilled && allConsent;
+                      const canSubmit = allRequiredFilled && form.consent.terms;
                       return (
                         <>
                           <Button
