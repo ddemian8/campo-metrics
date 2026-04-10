@@ -514,22 +514,18 @@ const Analyze = () => {
 
   const consentCheckboxes = [
     {
-      id: "public_profile" as const,
-      label: "I agree to make my performance data visible to Agents, Clubs and Scouts on the Campometric platform.",
-      description: "Your name, position, team and GPS metrics will be visible to verified scouts and agents searching the Campometric database.",
-      errorKey: "consent_public_profile",
-    },
-    {
-      id: "leaderboard" as const,
-      label: "I agree to appear on the public Campometric Leaderboard ranked by physical performance metrics.",
-      description: "Your name, position, league and key metrics (distance, max speed, sprints) will appear on the public leaderboard visible to anyone visiting campometric.com.",
-      errorKey: "consent_leaderboard",
-    },
-    {
       id: "terms" as const,
       label: "__terms__",
       description: "You must be at least 16 years old to use Campometric. If you are under 18, please ensure you have parental consent.",
       errorKey: "consent_terms",
+      required: true,
+    },
+    {
+      id: "public_profile" as const,
+      label: "I agree to make my performance data visible to scouts, agents, and clubs on the Campometric platform and leaderboard.",
+      description: "Your name, position, team and GPS metrics will be visible to verified scouts and agents. This is optional.",
+      errorKey: "consent_public_profile",
+      required: false,
     },
   ];
 
