@@ -18,17 +18,24 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+interface KeyMetric {
+  label: string;
+  value: string;
+  per90: string;
+  benchmark: string;
+  rating: "elite" | "good" | "average" | "below";
+}
+
 interface ReportData {
-  performance_score: number;
-  score_label: string;
   headline: string;
-  narrative: string;
-  strengths: string[];
-  areas_to_improve: string[];
-  position_ranking_percentile: number;
-  vs_team_average: string;
-  md_context_note: string;
-  next_session_recommendation: string;
+  executiveSummary: string;
+  performanceScore: number;
+  keyMetrics: KeyMetric[];
+  standoutStrength: { title: string; explanation: string };
+  areaToImprove: { title: string; explanation: string };
+  trainingRecommendation: { title: string; drill: string; duration: string; intensity: string };
+  positionalContext: string;
+  motivationalClose: string;
 }
 
 interface GpsData {
