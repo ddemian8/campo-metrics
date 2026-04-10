@@ -221,8 +221,9 @@ const Analyze = () => {
   const [profile, setProfile] = useState<any>(null);
   const [limitReached, setLimitReached] = useState(false);
   const [step, setStep] = useState(1);
-  const [isLoading, setIsLoading] = useState(false);
-  const [loadingStep, setLoadingStep] = useState(0);
+  const [isExtracting, setIsExtracting] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [extractionStep, setExtractionStep] = useState(0);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const nameRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -399,25 +400,17 @@ const Analyze = () => {
     if (currentStepId === "name") setTimeout(() => nameRef.current?.focus(), 300);
   }, [currentStepId]);
 
-  // Loading animation sequence - timed steps that keep going
+  // Extraction loading animation (3 steps for PDF parsing only)
   useEffect(() => {
-    if (!isLoading) return;
-    setLoadingStep(0);
-    const steps = [
-      { delay: 100 },   // step 0 → 1
-      { delay: 2000 },  // step 1 → 2
-      { delay: 4000 },  // step 2 → 3
-      { delay: 6000 },  // step 3 → 4
-      { delay: 8000 },  // step 4 → 5
-      { delay: 15000 }, // step 5 → 6 "Almost there..."
-      { delay: 20000 }, // step 6 → 7 "Finalizing..."
+    if (!isExtracting) return;
+    setExtractionStep(0);
+    const timers = [
+      setTimeout(() => setExtractionStep(1), 100),
+      setTimeout(() => setExtractionStep(2), 2000),
+      setTimeout(() => setExtractionStep(3), 4000),
     ];
-    const timers: NodeJS.Timeout[] = [];
-    steps.forEach((s, i) => {
-      timers.push(setTimeout(() => setLoadingStep(i + 1), s.delay));
-    });
     return () => timers.forEach(clearTimeout);
-  }, [isLoading]);
+  }, [isExtracting]);
 
   // Calculate DOB and age when dropdowns change
   useEffect(() => {
@@ -565,13 +558,14 @@ const Analyze = () => {
 
   // Single generation flow: submit → loading → auto-redirect
   const continueWithGps = async (gpsMetrics: Record<string, any>) => {
-    setIsLoading(true);
-    setGenerationError(null);
+    setIsExtracting(false);
     setPlayerMatchPhase(null);
+    setIsGenerating(true);
+    setGenerationError(null);
     try {
       if (!authUser || !profile) {
         setGenerationError("You must be logged in.");
-        setIsLoading(false);
+        setIsGenerating(false);
         return;
       }
 
@@ -613,7 +607,7 @@ const Analyze = () => {
 
       if (sessErr) {
         console.error('Session insert error:', sessErr);
-        setIsLoading(false);
+        setIsGenerating(false);
         setGenerationError('Failed to save session. Please try again.');
         return;
       }
@@ -646,7 +640,7 @@ const Analyze = () => {
 
       if (reportError || !reportData?.success) {
         console.error('Report generation failed:', reportError, reportData);
-        setIsLoading(false);
+        setIsGenerating(false);
         setGenerationError('Something went wrong generating your report. Please try again.');
         return;
       }
@@ -701,7 +695,7 @@ const Analyze = () => {
       navigate(`/report/${sessionId}`, { replace: true });
     } catch (err) {
       console.error('Error in submission:', err);
-      setIsLoading(false);
+      setIsGenerating(false);
       setGenerationError('Something went wrong. Please try again.');
     }
   };
@@ -718,7 +712,7 @@ const Analyze = () => {
     setGenerationError(null);
 
     if ((form.entryMethod === "pdf" || form.entryMethod === "screenshot") && form.gpsFile) {
-      setIsLoading(true);
+      setIsExtracting(true);
       try {
         const base64 = await fileToBase64(form.gpsFile);
         const { data: extractResult, error: extractError } = await supabase.functions.invoke("extract-gps-data", {
@@ -726,7 +720,7 @@ const Analyze = () => {
         });
 
         if (extractError || !extractResult?.success) {
-          setIsLoading(false);
+          setIsExtracting(false);
           setExtractionError("We couldn't read your file automatically. Please enter your data manually instead.");
           updateForm({ entryMethod: "manual" });
           return;
@@ -736,7 +730,7 @@ const Analyze = () => {
         setPlatformDetected(extractResult.platform_detected || "unknown");
 
         if (players.length === 0) {
-          setIsLoading(false);
+          setIsExtracting(false);
           setExtractionError("No player data found in the file. Please enter your data manually.");
           updateForm({ entryMethod: "manual" });
           return;
@@ -748,7 +742,7 @@ const Analyze = () => {
         }
 
         // Multi-player → fuzzy match
-        setIsLoading(false);
+        setIsExtracting(false);
         setExtractedPlayers(players);
         const names = players.map(p => p.athlete_name || "Unknown");
         const match = fuzzyMatchPlayer(form.fullName, names);
@@ -762,7 +756,7 @@ const Analyze = () => {
         }
       } catch (err) {
         console.error("File extraction error:", err);
-        setIsLoading(false);
+        setIsExtracting(false);
         setExtractionError("We couldn't read your file automatically. Please enter your data manually instead.");
         updateForm({ entryMethod: "manual" });
       }
@@ -1078,16 +1072,12 @@ const Analyze = () => {
     );
   }
 
-  // Loading screen — single flow, auto-redirects when done
-  if (isLoading) {
+  // PDF extraction loading screen (step-by-step, 3 steps only)
+  if (isExtracting) {
     const lines = [
       "Reading your GPS data...",
       "Finding your player data...",
-      "Analyzing sprint patterns...",
-      "Comparing to position benchmarks...",
-      "Generating personalized insights...",
-      "Almost there...",
-      "Finalizing your report...",
+      "Analyzing session metrics...",
     ];
 
     return (
@@ -1101,9 +1091,9 @@ const Analyze = () => {
 
         <div className="space-y-4 w-full max-w-md">
           {lines.map((line, i) => {
-            const isActive = loadingStep === i + 1;
-            const isDone = loadingStep > i + 1;
-            const isVisible = loadingStep >= i + 1;
+            const isActive = extractionStep === i + 1;
+            const isDone = extractionStep > i + 1;
+            const isVisible = extractionStep >= i + 1;
             if (!isVisible) return null;
             return (
               <motion.div
@@ -1130,9 +1120,34 @@ const Analyze = () => {
           <motion.div
             className="h-full bg-primary"
             initial={{ width: "0%" }}
-            animate={{ width: `${Math.min((loadingStep / 7) * 100, 95)}%` }}
+            animate={{ width: `${Math.min((extractionStep / 3) * 100, 95)}%` }}
             transition={{ duration: 0.5, ease: "linear" }}
           />
+        </div>
+      </div>
+    );
+  }
+
+  // AI report generation screen (simple spinner)
+  if (isGenerating) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4">
+        <div className="mb-12">
+          <span className="text-2xl font-bold tracking-tight">
+            <span className="text-foreground">Campo</span>
+            <span className="text-primary">metric</span>
+          </span>
+        </div>
+
+        <div className="flex flex-col items-center gap-6">
+          <div className="relative">
+            <div className="h-16 w-16 rounded-full border-4 border-muted" />
+            <div className="absolute inset-0 h-16 w-16 rounded-full border-4 border-primary border-t-transparent animate-spin" />
+          </div>
+          <div className="text-center">
+            <p className="text-lg font-semibold text-foreground">Generating your AI report...</p>
+            <p className="text-sm text-muted-foreground mt-2">This usually takes 10–15 seconds</p>
+          </div>
         </div>
       </div>
     );
