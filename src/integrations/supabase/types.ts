@@ -14,191 +14,479 @@ export type Database = {
   }
   public: {
     Tables: {
-      players: {
+      affiliate_referrals: {
         Row: {
-          age_calculated: number | null
+          commission_rate: number
+          created_at: string
+          id: string
+          referral_code: string
+          referred_id: string | null
+          referrer_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          commission_rate?: number
+          created_at?: string
+          id?: string
+          referral_code: string
+          referred_id?: string | null
+          referrer_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          commission_rate?: number
+          created_at?: string
+          id?: string
+          referral_code?: string
+          referred_id?: string | null
+          referrer_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "affiliate_referrals_referred_id_fkey"
+            columns: ["referred_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "affiliate_referrals_referrer_id_fkey"
+            columns: ["referrer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      anonymous_sessions: {
+        Row: {
+          ai_report: Json | null
+          anonymous_token: string
+          created_at: string
+          expires_at: string
+          gps_data: Json | null
+          id: string
+          input_method: string | null
+          opponent: string | null
+          player_name: string | null
+          position: string | null
+          session_date: string | null
+          session_type: string | null
+          status: string
+          training_day: string | null
+        }
+        Insert: {
+          ai_report?: Json | null
+          anonymous_token: string
+          created_at?: string
+          expires_at?: string
+          gps_data?: Json | null
+          id?: string
+          input_method?: string | null
+          opponent?: string | null
+          player_name?: string | null
+          position?: string | null
+          session_date?: string | null
+          session_type?: string | null
+          status?: string
+          training_day?: string | null
+        }
+        Update: {
+          ai_report?: Json | null
+          anonymous_token?: string
+          created_at?: string
+          expires_at?: string
+          gps_data?: Json | null
+          id?: string
+          input_method?: string | null
+          opponent?: string | null
+          player_name?: string | null
+          position?: string | null
+          session_date?: string | null
+          session_type?: string | null
+          status?: string
+          training_day?: string | null
+        }
+        Relationships: []
+      }
+      club_members: {
+        Row: {
+          club_id: string
+          id: string
+          is_active: boolean
+          joined_at: string
+          player_id: string
+          role: string
+        }
+        Insert: {
+          club_id: string
+          id?: string
+          is_active?: boolean
+          joined_at?: string
+          player_id: string
+          role?: string
+        }
+        Update: {
+          club_id?: string
+          id?: string
+          is_active?: boolean
+          joined_at?: string
+          player_id?: string
+          role?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "club_members_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "club_members_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      clubs: {
+        Row: {
+          admin_id: string | null
+          city: string | null
           country: string | null
           created_at: string
+          id: string
+          league: string | null
+          logo_url: string | null
+          max_players: number
+          name: string
+          paddle_customer_id: string | null
+          paddle_subscription_id: string | null
+          slug: string
+          subscription_status: string
+          updated_at: string
+          website: string | null
+        }
+        Insert: {
+          admin_id?: string | null
+          city?: string | null
+          country?: string | null
+          created_at?: string
+          id?: string
+          league?: string | null
+          logo_url?: string | null
+          max_players?: number
+          name: string
+          paddle_customer_id?: string | null
+          paddle_subscription_id?: string | null
+          slug: string
+          subscription_status?: string
+          updated_at?: string
+          website?: string | null
+        }
+        Update: {
+          admin_id?: string | null
+          city?: string | null
+          country?: string | null
+          created_at?: string
+          id?: string
+          league?: string | null
+          logo_url?: string | null
+          max_players?: number
+          name?: string
+          paddle_customer_id?: string | null
+          paddle_subscription_id?: string | null
+          slug?: string
+          subscription_status?: string
+          updated_at?: string
+          website?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clubs_admin_id_fkey"
+            columns: ["admin_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      player_stats_aggregate: {
+        Row: {
+          avg_accelerations_per90: number | null
+          avg_decelerations_per90: number | null
+          avg_distance_per90: number | null
+          avg_hsr_per90: number | null
+          avg_performance_score: number | null
+          avg_sprint_distance_per90: number | null
+          avg_sprints_per90: number | null
+          avg_top_speed: number | null
+          best_distance_single_match: number | null
+          best_performance_score: number | null
+          best_sprint_distance_single: number | null
+          best_top_speed: number | null
+          last_session_date: string | null
+          player_id: string
+          total_matches: number
+          total_sessions: number
+          total_trainings: number
+          updated_at: string
+        }
+        Insert: {
+          avg_accelerations_per90?: number | null
+          avg_decelerations_per90?: number | null
+          avg_distance_per90?: number | null
+          avg_hsr_per90?: number | null
+          avg_performance_score?: number | null
+          avg_sprint_distance_per90?: number | null
+          avg_sprints_per90?: number | null
+          avg_top_speed?: number | null
+          best_distance_single_match?: number | null
+          best_performance_score?: number | null
+          best_sprint_distance_single?: number | null
+          best_top_speed?: number | null
+          last_session_date?: string | null
+          player_id: string
+          total_matches?: number
+          total_sessions?: number
+          total_trainings?: number
+          updated_at?: string
+        }
+        Update: {
+          avg_accelerations_per90?: number | null
+          avg_decelerations_per90?: number | null
+          avg_distance_per90?: number | null
+          avg_hsr_per90?: number | null
+          avg_performance_score?: number | null
+          avg_sprint_distance_per90?: number | null
+          avg_sprints_per90?: number | null
+          avg_top_speed?: number | null
+          best_distance_single_match?: number | null
+          best_performance_score?: number | null
+          best_sprint_distance_single?: number | null
+          best_top_speed?: number | null
+          last_session_date?: string | null
+          player_id?: string
+          total_matches?: number
+          total_sessions?: number
+          total_trainings?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "player_stats_aggregate_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          account_type: string
+          affiliate_code: string | null
+          avatar_url: string | null
+          country: string | null
+          created_at: string
+          current_club: string | null
+          current_league: string | null
           date_of_birth: string | null
-          first_name: string
+          full_name: string | null
           height_cm: number | null
           id: string
-          last_name: string
-          league: string | null
+          is_public: boolean
+          paddle_customer_id: string | null
+          paddle_subscription_id: string | null
           position: string | null
-          team_name: string | null
-          transfermarkt_club: string | null
-          transfermarkt_league: string | null
+          preferred_foot: string | null
+          referred_by: string | null
+          reports_reset_date: string | null
+          reports_used_this_month: number
+          subscription_plan: string
+          subscription_status: string
           transfermarkt_url: string | null
           updated_at: string
-          user_id: string | null
+          user_id: string
+          username: string | null
           weight_kg: number | null
         }
         Insert: {
-          age_calculated?: number | null
+          account_type?: string
+          affiliate_code?: string | null
+          avatar_url?: string | null
           country?: string | null
           created_at?: string
+          current_club?: string | null
+          current_league?: string | null
           date_of_birth?: string | null
-          first_name: string
+          full_name?: string | null
           height_cm?: number | null
           id?: string
-          last_name: string
-          league?: string | null
+          is_public?: boolean
+          paddle_customer_id?: string | null
+          paddle_subscription_id?: string | null
           position?: string | null
-          team_name?: string | null
-          transfermarkt_club?: string | null
-          transfermarkt_league?: string | null
+          preferred_foot?: string | null
+          referred_by?: string | null
+          reports_reset_date?: string | null
+          reports_used_this_month?: number
+          subscription_plan?: string
+          subscription_status?: string
           transfermarkt_url?: string | null
           updated_at?: string
-          user_id?: string | null
+          user_id: string
+          username?: string | null
           weight_kg?: number | null
         }
         Update: {
-          age_calculated?: number | null
+          account_type?: string
+          affiliate_code?: string | null
+          avatar_url?: string | null
           country?: string | null
           created_at?: string
+          current_club?: string | null
+          current_league?: string | null
           date_of_birth?: string | null
-          first_name?: string
+          full_name?: string | null
           height_cm?: number | null
           id?: string
-          last_name?: string
-          league?: string | null
+          is_public?: boolean
+          paddle_customer_id?: string | null
+          paddle_subscription_id?: string | null
           position?: string | null
-          team_name?: string | null
-          transfermarkt_club?: string | null
-          transfermarkt_league?: string | null
+          preferred_foot?: string | null
+          referred_by?: string | null
+          reports_reset_date?: string | null
+          reports_used_this_month?: number
+          subscription_plan?: string
+          subscription_status?: string
           transfermarkt_url?: string | null
           updated_at?: string
-          user_id?: string | null
+          user_id?: string
+          username?: string | null
           weight_kg?: number | null
         }
         Relationships: []
       }
-      sessions: {
+      reports: {
         Row: {
-          acc_ev: number | null
-          age_calculated: number | null
-          athlete_name: string | null
-          av_sp: number | null
-          consent_leaderboard: boolean | null
-          consent_public_profile: boolean | null
-          consent_terms: boolean | null
-          consent_timestamp: string | null
-          country: string | null
+          ai_report: Json | null
           created_at: string
-          date_of_birth: string | null
-          dec_ev: number | null
-          dist_sp_z4: number | null
-          dist_sp_z4plus: number | null
-          dist_sp_z5: number | null
-          distance: number | null
-          duration: string | null
-          entry_method: string | null
-          first_name: string
-          height_cm: number | null
-          hmld: number | null
+          generation_time_ms: number | null
           id: string
-          last_name: string
-          league: string | null
-          max_sp: number | null
-          md_day: string | null
-          opponent: string | null
-          position: string | null
-          session_date: string | null
-          session_type: string | null
-          sp_ev: number | null
-          status: string | null
-          team_name: string | null
-          transfermarkt_club: string | null
-          transfermarkt_league: string | null
-          transfermarkt_url: string | null
+          is_public: boolean
+          model_used: string | null
+          player_id: string
+          session_id: string
+          tokens_used: number | null
           updated_at: string
-          user_id: string | null
-          weight_kg: number | null
         }
         Insert: {
-          acc_ev?: number | null
-          age_calculated?: number | null
-          athlete_name?: string | null
-          av_sp?: number | null
-          consent_leaderboard?: boolean | null
-          consent_public_profile?: boolean | null
-          consent_terms?: boolean | null
-          consent_timestamp?: string | null
-          country?: string | null
+          ai_report?: Json | null
           created_at?: string
-          date_of_birth?: string | null
-          dec_ev?: number | null
-          dist_sp_z4?: number | null
-          dist_sp_z4plus?: number | null
-          dist_sp_z5?: number | null
-          distance?: number | null
-          duration?: string | null
-          entry_method?: string | null
-          first_name: string
-          height_cm?: number | null
-          hmld?: number | null
+          generation_time_ms?: number | null
           id?: string
-          last_name: string
-          league?: string | null
-          max_sp?: number | null
-          md_day?: string | null
-          opponent?: string | null
-          position?: string | null
-          session_date?: string | null
-          session_type?: string | null
-          sp_ev?: number | null
-          status?: string | null
-          team_name?: string | null
-          transfermarkt_club?: string | null
-          transfermarkt_league?: string | null
-          transfermarkt_url?: string | null
+          is_public?: boolean
+          model_used?: string | null
+          player_id: string
+          session_id: string
+          tokens_used?: number | null
           updated_at?: string
-          user_id?: string | null
-          weight_kg?: number | null
         }
         Update: {
-          acc_ev?: number | null
-          age_calculated?: number | null
-          athlete_name?: string | null
-          av_sp?: number | null
-          consent_leaderboard?: boolean | null
-          consent_public_profile?: boolean | null
-          consent_terms?: boolean | null
-          consent_timestamp?: string | null
-          country?: string | null
+          ai_report?: Json | null
           created_at?: string
-          date_of_birth?: string | null
-          dec_ev?: number | null
-          dist_sp_z4?: number | null
-          dist_sp_z4plus?: number | null
-          dist_sp_z5?: number | null
-          distance?: number | null
-          duration?: string | null
-          entry_method?: string | null
-          first_name?: string
-          height_cm?: number | null
-          hmld?: number | null
+          generation_time_ms?: number | null
           id?: string
-          last_name?: string
-          league?: string | null
-          max_sp?: number | null
-          md_day?: string | null
-          opponent?: string | null
-          position?: string | null
-          session_date?: string | null
-          session_type?: string | null
-          sp_ev?: number | null
-          status?: string | null
-          team_name?: string | null
-          transfermarkt_club?: string | null
-          transfermarkt_league?: string | null
-          transfermarkt_url?: string | null
+          is_public?: boolean
+          model_used?: string | null
+          player_id?: string
+          session_id?: string
+          tokens_used?: number | null
           updated_at?: string
-          user_id?: string | null
-          weight_kg?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "reports_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reports_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sessions: {
+        Row: {
+          competition: string | null
+          created_at: string
+          gps_data: Json | null
+          id: string
+          input_method: string | null
+          minutes_played: number | null
+          opponent: string | null
+          player_id: string
+          session_date: string
+          session_type: string
+          status: string
+          training_day: string | null
+          updated_at: string
+          uploaded_file_url: string | null
+        }
+        Insert: {
+          competition?: string | null
+          created_at?: string
+          gps_data?: Json | null
+          id?: string
+          input_method?: string | null
+          minutes_played?: number | null
+          opponent?: string | null
+          player_id: string
+          session_date: string
+          session_type: string
+          status?: string
+          training_day?: string | null
+          updated_at?: string
+          uploaded_file_url?: string | null
+        }
+        Update: {
+          competition?: string | null
+          created_at?: string
+          gps_data?: Json | null
+          id?: string
+          input_method?: string | null
+          minutes_played?: number | null
+          opponent?: string | null
+          player_id?: string
+          session_date?: string
+          session_type?: string
+          status?: string
+          training_day?: string | null
+          updated_at?: string
+          uploaded_file_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sessions_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
