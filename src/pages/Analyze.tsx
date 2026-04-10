@@ -11,9 +11,35 @@ import { format, differenceInYears } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 
 type EntryMethod = "pdf" | "screenshot" | "manual";
-type Position = "GK" | "DEF" | "MID" | "FWD";
+type PositionZone = "GK" | "DEF" | "MID" | "FWD";
+type PositionSpecific = "GK" | "CB" | "RB" | "LB" | "RWB" | "LWB" | "CDM" | "CM" | "CAM" | "RM" | "LM" | "ST" | "SS" | "RW" | "LW" | "CF";
 type SessionType = "match" | "training";
 type MDDay = "MD-3" | "MD-2" | "MD-1" | "MD0" | "MD+1" | "MD+2" | "MD+3";
+
+const SUB_POSITIONS: Record<PositionZone, { id: PositionSpecific; label: string }[]> = {
+  GK: [{ id: "GK", label: "Goalkeeper" }],
+  DEF: [
+    { id: "CB", label: "Central Back" },
+    { id: "RB", label: "Right Back" },
+    { id: "LB", label: "Left Back" },
+    { id: "RWB", label: "Right Wing-back" },
+    { id: "LWB", label: "Left Wing-back" },
+  ],
+  MID: [
+    { id: "CDM", label: "Defensive Mid" },
+    { id: "CM", label: "Central Mid" },
+    { id: "CAM", label: "Attacking Mid" },
+    { id: "RM", label: "Right Mid" },
+    { id: "LM", label: "Left Mid" },
+  ],
+  FWD: [
+    { id: "ST", label: "Striker" },
+    { id: "SS", label: "Second Striker" },
+    { id: "RW", label: "Right Winger" },
+    { id: "LW", label: "Left Winger" },
+    { id: "CF", label: "Centre Forward" },
+  ],
+};
 
 interface TransfermarktData {
   club: string | null;
@@ -36,7 +62,8 @@ interface FormState {
   age_calculated: number | null;
   height_cm: string;
   weight_kg: string;
-  position: Position | null;
+  position: PositionZone | null;
+  positionSpecific: PositionSpecific | null;
   teamName: string;
   league: string;
   country: string;
@@ -127,6 +154,7 @@ const Analyze = () => {
     height_cm: "",
     weight_kg: "",
     position: null,
+    positionSpecific: null,
     teamName: "",
     league: "",
     country: "",
