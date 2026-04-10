@@ -1,7 +1,8 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
-import { Menu, X } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { Menu, X, LogOut, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client";
 
 const navLinks = [
   { label: "How it works", href: "#how-it-works" },
@@ -13,6 +14,36 @@ const navLinks = [
 
 const Navbar = () => {
   const [open, setOpen] = useState(false);
+  const [user, setUser] = useState<any>(null);
+  const [profileName, setProfileName] = useState("");
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        const meta = session.user.user_metadata;
+        setProfileName(meta?.full_name || session.user.email || "");
+      } else {
+        setProfileName("");
+      }
+    });
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        const meta = session.user.user_metadata;
+        setProfileName(meta?.full_name || session.user.email || "");
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    navigate("/");
+  };
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-xl">
@@ -30,13 +61,30 @@ const Navbar = () => {
             </a>
           ))}
         </div>
+
         <div className="hidden md:flex items-center gap-3">
-          <Button variant="ghost" size="sm" asChild>
-            <Link to="/login">Log in</Link>
-          </Button>
-          <Button size="sm" asChild>
-            <Link to="/signup">Start free</Link>
-          </Button>
+          {user ? (
+            <>
+              <Button variant="ghost" size="sm" asChild>
+                <Link to="/dashboard">
+                  <User size={16} className="mr-1" />
+                  {profileName.split(" ")[0] || "Dashboard"}
+                </Link>
+              </Button>
+              <Button variant="ghost" size="sm" onClick={handleLogout}>
+                <LogOut size={16} className="mr-1" /> Log out
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button variant="ghost" size="sm" asChild>
+                <Link to="/login">Log in</Link>
+              </Button>
+              <Button size="sm" asChild>
+                <Link to="/signup">Start free</Link>
+              </Button>
+            </>
+          )}
         </div>
 
         {/* Mobile toggle */}
@@ -54,12 +102,25 @@ const Navbar = () => {
             </a>
           ))}
           <div className="flex gap-3 pt-2">
-            <Button variant="ghost" size="sm" asChild>
-              <Link to="/login">Log in</Link>
-            </Button>
-            <Button size="sm" asChild>
-              <Link to="/signup">Start free</Link>
-            </Button>
+            {user ? (
+              <>
+                <Button variant="ghost" size="sm" asChild>
+                  <Link to="/dashboard" onClick={() => setOpen(false)}>Dashboard</Link>
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => { handleLogout(); setOpen(false); }}>
+                  Log out
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button variant="ghost" size="sm" asChild>
+                  <Link to="/login" onClick={() => setOpen(false)}>Log in</Link>
+                </Button>
+                <Button size="sm" asChild>
+                  <Link to="/signup" onClick={() => setOpen(false)}>Start free</Link>
+                </Button>
+              </>
+            )}
           </div>
         </div>
       )}
