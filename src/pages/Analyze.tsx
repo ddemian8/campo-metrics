@@ -558,13 +558,13 @@ const Analyze = () => {
 
   // Single generation flow: submit → loading → auto-redirect
   const continueWithGps = async (gpsMetrics: Record<string, any>) => {
-    setIsLoading(true);
+    setIsExtracting(false);
+    setIsGenerating(true);
     setGenerationError(null);
-    setPlayerMatchPhase(null);
     try {
       if (!authUser || !profile) {
         setGenerationError("You must be logged in.");
-        setIsLoading(false);
+        setIsGenerating(false);
         return;
       }
 
@@ -606,7 +606,7 @@ const Analyze = () => {
 
       if (sessErr) {
         console.error('Session insert error:', sessErr);
-        setIsLoading(false);
+        setIsGenerating(false);
         setGenerationError('Failed to save session. Please try again.');
         return;
       }
@@ -639,7 +639,7 @@ const Analyze = () => {
 
       if (reportError || !reportData?.success) {
         console.error('Report generation failed:', reportError, reportData);
-        setIsLoading(false);
+        setIsGenerating(false);
         setGenerationError('Something went wrong generating your report. Please try again.');
         return;
       }
@@ -694,7 +694,7 @@ const Analyze = () => {
       navigate(`/report/${sessionId}`, { replace: true });
     } catch (err) {
       console.error('Error in submission:', err);
-      setIsLoading(false);
+      setIsGenerating(false);
       setGenerationError('Something went wrong. Please try again.');
     }
   };
