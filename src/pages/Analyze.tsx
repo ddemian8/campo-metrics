@@ -539,22 +539,26 @@ const Analyze = () => {
     setIsLoading(true);
     setPlayerMatchPhase(null);
     try {
+      if (!authUser || !profile) {
+        setExtractionError("You must be logged in.");
+        setIsLoading(false);
+        return;
+      }
+
       const sessionId = crypto.randomUUID();
       sessionIdRef.current = sessionId;
       const { firstName, lastName } = splitName(form.fullName);
-      const anonymousToken = crypto.randomUUID();
-      localStorage.setItem(`report_token_${sessionId}`, anonymousToken);
 
-      await supabase.from('anonymous_sessions').insert({
+      // Insert into sessions table (authenticated)
+      const { error: sessErr } = await supabase.from('sessions').insert({
         id: sessionId,
-        anonymous_token: anonymousToken,
+        player_id: profile.id,
         session_type: form.sessionType || 'match',
-        session_date: form.sessionDate || null,
+        session_date: form.sessionDate || format(new Date(), 'yyyy-MM-dd'),
         training_day: form.mdDay || null,
         input_method: form.entryMethod === 'pdf' ? 'pdf_upload' : (form.entryMethod || 'manual'),
-        player_name: form.fullName,
-        position: form.position || null,
         opponent: form.opponent || null,
+        position_specific: form.positionSpecific || null,
         gps_data: {
           position_zone: form.position || null,
           position_specific: form.positionSpecific || null,
@@ -571,14 +575,18 @@ const Analyze = () => {
           transfermarkt_club: form.transfermarkt_data.club,
           transfermarkt_league: form.transfermarkt_data.league,
           ...gpsMetrics,
-          consent_public_profile: form.consent.public_profile,
-          consent_leaderboard: form.consent.leaderboard,
-          consent_terms: form.consent.terms,
-          consent_timestamp: new Date().toISOString(),
         },
         status: 'processing',
-      } as any);
+      });
 
+      if (sessErr) {
+        console.error('Session insert error:', sessErr);
+        setIsLoading(false);
+        setExtractionError('Failed to save session. Please try again.');
+        return;
+      }
+
+      // Call generate-report
       const { data: reportData, error: reportError } = await supabase.functions.invoke('generate-report', {
         body: {
           playerData: {
@@ -611,11 +619,29 @@ const Analyze = () => {
         return;
       }
 
-      await supabase.from('anonymous_sessions').update({
-        ai_report: reportData.report,
-        status: 'completed',
-      } as any).eq('id', sessionId);
+      // Determine if report should be public
+      const isPaid = profile.subscription_plan !== 'free' || profile.account_type !== 'free';
 
+      // Insert into reports table
+      await supabase.from('reports').insert({
+        session_id: sessionId,
+        player_id: profile.id,
+        ai_report: reportData.report,
+        is_public: isPaid,
+        model_used: reportData.model || 'claude',
+      });
+
+      // Update session status
+      await supabase.from('sessions').update({ status: 'completed' } as any).eq('id', sessionId);
+
+      // Increment reports_used_this_month for free users
+      if (!isPaid) {
+        await supabase.from('profiles').update({
+          reports_used_this_month: (profile.reports_used_this_month || 0) + 1,
+        }).eq('id', profile.id);
+      }
+
+      // Store the report ID for navigation (use session ID as lookup)
       setReportReady(true);
     } catch (err) {
       console.error('Error in submission:', err);
