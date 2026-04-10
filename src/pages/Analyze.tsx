@@ -865,6 +865,45 @@ const Analyze = () => {
     );
   };
 
+  // Auth checking screen
+  if (authChecking) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="h-8 w-8 text-primary animate-spin" />
+      </div>
+    );
+  }
+
+  // Report limit reached screen
+  if (limitReached) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4 text-center">
+        <div className="mb-8">
+          <span className="text-2xl font-bold tracking-tight">
+            <span className="text-foreground">Campo</span>
+            <span className="text-primary">metric</span>
+          </span>
+        </div>
+        <Lock className="h-12 w-12 text-muted-foreground mb-4" />
+        <h1 className="text-2xl font-bold text-foreground mb-2">You've used all 3 free reports this month</h1>
+        <p className="text-muted-foreground mb-8 max-w-md">
+          Upgrade to Player Pro for unlimited reports — €9/month
+        </p>
+        <div className="flex flex-col sm:flex-row gap-3">
+          <Button
+            onClick={() => navigate("/#pricing")}
+            className="bg-[#1D9E75] hover:bg-[#178a64] text-white font-semibold h-12 px-8"
+          >
+            Upgrade to Pro →
+          </Button>
+          <Button variant="outline" onClick={() => navigate("/dashboard")}>
+            View past reports →
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   // Player confirmation/selection screen
   if (playerMatchPhase === "confirm" && extractedPlayers.length > 0) {
     const player = extractedPlayers[matchedPlayerIndex];
