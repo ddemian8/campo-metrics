@@ -136,6 +136,7 @@ const Analyze = () => {
   const [dragOver, setDragOver] = useState(false);
   const [extractionError, setExtractionError] = useState<string | null>(null);
   const sessionIdRef = useRef<string>("");
+  const [reportReady, setReportReady] = useState(false);
 
   const todayDay = String(now.getDate()).padStart(2, "0");
   const todayMonth = String(now.getMonth() + 1);
