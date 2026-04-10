@@ -557,6 +557,8 @@ const Analyze = () => {
         status: 'completed',
       } as any).eq('id', sessionId);
 
+      setReportReady(true);
+
     } catch (err) {
       console.error('Error in submission:', err);
       setIsLoading(false);
