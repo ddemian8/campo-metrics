@@ -30,7 +30,9 @@ serve(async (req) => {
       decelerations: playerData.decEv || null,
     });
 
-    const userMessage = `Analyze this match/training performance and return a JSON object with this exact structure:
+    const userMessage = `The following GPS data is for ONE specific player extracted from a team session PDF or entered manually. Analyze ONLY this player's individual performance.
+
+Analyze this match/training performance and return a JSON object with this exact structure:
 
 {
   "headline": "A short punchy 6-10 word headline capturing the performance",
