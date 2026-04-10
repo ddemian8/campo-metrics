@@ -31,33 +31,41 @@ interface ReportData {
   next_session_recommendation: string;
 }
 
+interface GpsData {
+  first_name?: string;
+  last_name?: string;
+  date_of_birth?: string;
+  age_calculated?: number;
+  height_cm?: number;
+  weight_kg?: number;
+  team_name?: string;
+  league?: string;
+  country?: string;
+  transfermarkt_url?: string;
+  transfermarkt_club?: string;
+  transfermarkt_league?: string;
+  duration?: string;
+  distance?: number;
+  max_sp?: number;
+  av_sp?: number;
+  sp_ev?: number;
+  hmld?: number;
+  acc_ev?: number;
+  dec_ev?: number;
+  dist_sp_z4?: number;
+  dist_sp_z4plus?: number;
+  dist_sp_z5?: number;
+}
+
 interface SessionData {
   id: string;
-  first_name: string;
-  last_name: string;
+  player_name: string | null;
   position: string | null;
-  age_calculated: number | null;
-  height_cm: number | null;
-  weight_kg: number | null;
-  team_name: string | null;
-  league: string | null;
-  country: string | null;
-  transfermarkt_url: string | null;
   session_type: string | null;
-  md_day: string | null;
+  training_day: string | null;
   session_date: string | null;
   opponent: string | null;
-  duration: string | null;
-  distance: number | null;
-  max_sp: number | null;
-  av_sp: number | null;
-  sp_ev: number | null;
-  hmld: number | null;
-  acc_ev: number | null;
-  dec_ev: number | null;
-  dist_sp_z4: number | null;
-  dist_sp_z4plus: number | null;
-  dist_sp_z5: number | null;
+  gps_data: GpsData | null;
 }
 
 const positionColors: Record<string, string> = {
