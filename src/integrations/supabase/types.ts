@@ -305,6 +305,7 @@ export type Database = {
           paddle_customer_id: string | null
           paddle_subscription_id: string | null
           position: string | null
+          position_specific: string | null
           preferred_foot: string | null
           referred_by: string | null
           reports_reset_date: string | null
@@ -333,6 +334,7 @@ export type Database = {
           paddle_customer_id?: string | null
           paddle_subscription_id?: string | null
           position?: string | null
+          position_specific?: string | null
           preferred_foot?: string | null
           referred_by?: string | null
           reports_reset_date?: string | null
@@ -361,6 +363,7 @@ export type Database = {
           paddle_customer_id?: string | null
           paddle_subscription_id?: string | null
           position?: string | null
+          position_specific?: string | null
           preferred_foot?: string | null
           referred_by?: string | null
           reports_reset_date?: string | null
@@ -439,6 +442,7 @@ export type Database = {
           minutes_played: number | null
           opponent: string | null
           player_id: string
+          position_specific: string | null
           session_date: string
           session_type: string
           status: string
@@ -455,6 +459,7 @@ export type Database = {
           minutes_played?: number | null
           opponent?: string | null
           player_id: string
+          position_specific?: string | null
           session_date: string
           session_type: string
           status?: string
@@ -471,6 +476,7 @@ export type Database = {
           minutes_played?: number | null
           opponent?: string | null
           player_id?: string
+          position_specific?: string | null
           session_date?: string
           session_type?: string
           status?: string
