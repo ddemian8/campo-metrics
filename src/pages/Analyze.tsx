@@ -366,8 +366,6 @@ const Analyze = () => {
         if (!form.manualData.sp_ev) e.sp_ev = "Required";
         if (!form.manualData.hmld) e.hmld = "Required";
       }
-      if (!form.consent.public_profile) e.consent_public_profile = "You must accept this to generate your report and be discoverable on Campometric.";
-      if (!form.consent.leaderboard) e.consent_leaderboard = "Leaderboard participation is required to use the Campometric platform.";
       if (!form.consent.terms) e.consent_terms = "Please accept the Terms of Service and Privacy Policy to continue.";
     }
     setErrors(e);
@@ -485,7 +483,6 @@ const Analyze = () => {
         input_method: form.entryMethod || 'manual',
         player_name: form.fullName,
         position: form.position || null,
-        position_specific: form.positionSpecific || null,
         opponent: form.opponent || null,
         gps_data: {
           position_zone: form.position || null,
