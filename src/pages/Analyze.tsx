@@ -474,6 +474,9 @@ const Analyze = () => {
       }
 
       const anonymousToken = crypto.randomUUID();
+      localStorage.setItem(`report_token_${sessionId}`, anonymousToken);
+
+      // Save session first
       await supabase.from('anonymous_sessions').insert({
         id: sessionId,
         anonymous_token: anonymousToken,
@@ -507,8 +510,50 @@ const Analyze = () => {
         },
         status: 'processing',
       } as any);
+
+      // Call generate-report edge function
+      const { data: reportData, error: reportError } = await supabase.functions.invoke('generate-report', {
+        body: {
+          playerData: {
+            fullName: form.fullName,
+            position: form.position,
+            positionSpecific: form.positionSpecific,
+            sessionType: form.sessionType,
+            mdDay: form.mdDay,
+            opponent: form.opponent,
+            minutesPlayed: gpsMetrics.duration || null,
+            duration: gpsMetrics.duration || null,
+            distance: gpsMetrics.distance || null,
+            maxSpeed: gpsMetrics.max_sp || null,
+            avSpeed: gpsMetrics.av_sp || null,
+            spEv: gpsMetrics.sp_ev || null,
+            hmld: gpsMetrics.hmld || null,
+            distSpZ4: gpsMetrics.dist_sp_z4 || null,
+            distSpZ4Plus: gpsMetrics.dist_sp_z4plus || null,
+            distSpZ5: gpsMetrics.dist_sp_z5 || null,
+            accEv: gpsMetrics.acc_ev || null,
+            decEv: gpsMetrics.dec_ev || null,
+          },
+        },
+      });
+
+      if (reportError || !reportData?.success) {
+        console.error('Report generation failed:', reportError, reportData);
+        setIsLoading(false);
+        setExtractionError('Report generation failed. Please try again.');
+        return;
+      }
+
+      // Save the AI report to the anonymous session
+      await supabase.from('anonymous_sessions').update({
+        ai_report: reportData.report,
+        status: 'completed',
+      } as any).eq('id', sessionId);
+
     } catch (err) {
-      console.error('Error saving session:', err);
+      console.error('Error in submission:', err);
+      setIsLoading(false);
+      setExtractionError('Something went wrong. Please try again.');
     }
   };
 
