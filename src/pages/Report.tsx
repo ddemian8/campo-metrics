@@ -31,33 +31,41 @@ interface ReportData {
   next_session_recommendation: string;
 }
 
+interface GpsData {
+  first_name?: string;
+  last_name?: string;
+  date_of_birth?: string;
+  age_calculated?: number;
+  height_cm?: number;
+  weight_kg?: number;
+  team_name?: string;
+  league?: string;
+  country?: string;
+  transfermarkt_url?: string;
+  transfermarkt_club?: string;
+  transfermarkt_league?: string;
+  duration?: string;
+  distance?: number;
+  max_sp?: number;
+  av_sp?: number;
+  sp_ev?: number;
+  hmld?: number;
+  acc_ev?: number;
+  dec_ev?: number;
+  dist_sp_z4?: number;
+  dist_sp_z4plus?: number;
+  dist_sp_z5?: number;
+}
+
 interface SessionData {
   id: string;
-  first_name: string;
-  last_name: string;
+  player_name: string | null;
   position: string | null;
-  age_calculated: number | null;
-  height_cm: number | null;
-  weight_kg: number | null;
-  team_name: string | null;
-  league: string | null;
-  country: string | null;
-  transfermarkt_url: string | null;
   session_type: string | null;
-  md_day: string | null;
+  training_day: string | null;
   session_date: string | null;
   opponent: string | null;
-  duration: string | null;
-  distance: number | null;
-  max_sp: number | null;
-  av_sp: number | null;
-  sp_ev: number | null;
-  hmld: number | null;
-  acc_ev: number | null;
-  dec_ev: number | null;
-  dist_sp_z4: number | null;
-  dist_sp_z4plus: number | null;
-  dist_sp_z5: number | null;
+  gps_data: GpsData | null;
 }
 
 const positionColors: Record<string, string> = {
@@ -89,7 +97,7 @@ const Report = () => {
       try {
         // Fetch session data
         const { data: sessionData, error: fetchError } = await supabase
-          .from("sessions")
+          .from("anonymous_sessions")
           .select("*")
           .eq("id", id)
           .single();
@@ -100,34 +108,45 @@ const Report = () => {
           return;
         }
 
-        setSession(sessionData as SessionData);
+        const gps = (sessionData.gps_data as GpsData) || {};
+        const mapped: SessionData = {
+          id: sessionData.id,
+          player_name: sessionData.player_name,
+          position: sessionData.position,
+          session_type: sessionData.session_type,
+          training_day: sessionData.training_day,
+          session_date: sessionData.session_date,
+          opponent: sessionData.opponent,
+          gps_data: gps,
+        };
+        setSession(mapped);
 
         // Generate AI report
         const { data: reportResult, error: reportError } =
           await supabase.functions.invoke("generate-report", {
             body: {
               playerData: {
-                fullName: `${sessionData.first_name} ${sessionData.last_name}`,
-                age: sessionData.age_calculated || "unknown",
-                height: sessionData.height_cm || "unknown",
-                weight: sessionData.weight_kg || null,
+                fullName: sessionData.player_name || `${gps.first_name || ''} ${gps.last_name || ''}`.trim(),
+                age: gps.age_calculated || "unknown",
+                height: gps.height_cm || "unknown",
+                weight: gps.weight_kg || null,
                 position: sessionData.position || "unknown",
-                teamName: sessionData.team_name || "unknown",
-                league: sessionData.league || "unknown",
+                teamName: gps.team_name || "unknown",
+                league: gps.league || "unknown",
                 sessionType: sessionData.session_type || "match",
-                mdDay: sessionData.md_day || "MD0",
+                mdDay: sessionData.training_day || "MD0",
                 sessionDate: sessionData.session_date || "unknown",
-                duration: sessionData.duration || "",
-                distance: sessionData.distance || "",
-                maxSpeed: sessionData.max_sp || "",
-                avSpeed: sessionData.av_sp || "",
-                spEv: sessionData.sp_ev || "",
-                hmld: sessionData.hmld || "",
-                distSpZ4: sessionData.dist_sp_z4 || "",
-                distSpZ4Plus: sessionData.dist_sp_z4plus || "",
-                distSpZ5: sessionData.dist_sp_z5 || "",
-                accEv: sessionData.acc_ev || "",
-                decEv: sessionData.dec_ev || "",
+                duration: gps.duration || "",
+                distance: gps.distance || "",
+                maxSpeed: gps.max_sp || "",
+                avSpeed: gps.av_sp || "",
+                spEv: gps.sp_ev || "",
+                hmld: gps.hmld || "",
+                distSpZ4: gps.dist_sp_z4 || "",
+                distSpZ4Plus: gps.dist_sp_z4plus || "",
+                distSpZ5: gps.dist_sp_z5 || "",
+                accEv: gps.acc_ev || "",
+                decEv: gps.dec_ev || "",
               },
             },
           });
@@ -232,11 +251,13 @@ const Report = () => {
     );
   }
 
-  const fullName = `${session.first_name} ${session.last_name}`;
-  const initials = `${session.first_name?.[0] || ""}${session.last_name?.[0] || ""}`.toUpperCase();
+  const gps = session.gps_data || {};
+  const fullName = session.player_name || `${gps.first_name || ''} ${gps.last_name || ''}`.trim() || 'Unknown';
+  const nameParts = fullName.split(' ');
+  const initials = `${nameParts[0]?.[0] || ''}${nameParts[nameParts.length - 1]?.[0] || ''}`.toUpperCase();
   const sessionInfo = [
     session.session_type === "match" ? "Match" : "Training",
-    session.md_day,
+    session.training_day,
     session.session_date,
     session.opponent ? `vs ${session.opponent}` : null,
   ]
@@ -244,12 +265,12 @@ const Report = () => {
     .join(" · ");
 
   const metrics = [
-    { label: "Total Distance", value: session.distance ? `${session.distance}m` : "—", },
-    { label: "Max Speed", value: session.max_sp ? `${session.max_sp} km/h` : "—" },
-    { label: "Sprint Count", value: session.sp_ev ?? "—" },
-    { label: "HMLD", value: session.hmld ? `${session.hmld}m` : "—" },
-    { label: "Duration", value: session.duration || "—" },
-    { label: "Avg Speed", value: session.av_sp ? `${session.av_sp} km/h` : "—" },
+    { label: "Total Distance", value: gps.distance ? `${gps.distance}m` : "—" },
+    { label: "Max Speed", value: gps.max_sp ? `${gps.max_sp} km/h` : "—" },
+    { label: "Sprint Count", value: gps.sp_ev ?? "—" },
+    { label: "HMLD", value: gps.hmld ? `${gps.hmld}m` : "—" },
+    { label: "Duration", value: gps.duration || "—" },
+    { label: "Avg Speed", value: gps.av_sp ? `${gps.av_sp} km/h` : "—" },
   ];
 
   return (
@@ -287,20 +308,20 @@ const Report = () => {
                   )}
                   <span className="text-[13px] text-muted-foreground">
                     {[
-                      session.age_calculated ? `${session.age_calculated} years` : null,
-                      session.height_cm ? `${session.height_cm} cm` : null,
-                      session.weight_kg ? `${session.weight_kg} kg` : null,
+                      gps.age_calculated ? `${gps.age_calculated} years` : null,
+                      gps.height_cm ? `${gps.height_cm} cm` : null,
+                      gps.weight_kg ? `${gps.weight_kg} kg` : null,
                     ].filter(Boolean).join(" · ")}
                   </span>
                 </div>
-                {(session.team_name || session.league) && (
+                {(gps.team_name || gps.league) && (
                   <p className="text-[13px] text-muted-foreground mt-0.5">
-                    {[session.team_name, session.league].filter(Boolean).join(" · ")}
+                    {[gps.team_name, gps.league].filter(Boolean).join(" · ")}
                   </p>
                 )}
-                {session.transfermarkt_url && (
+                {gps.transfermarkt_url && (
                   <a
-                    href={session.transfermarkt_url}
+                    href={gps.transfermarkt_url}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-[12px] text-primary hover:underline inline-flex items-center gap-1 mt-1"
