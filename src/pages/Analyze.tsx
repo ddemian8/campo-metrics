@@ -221,8 +221,9 @@ const Analyze = () => {
   const [profile, setProfile] = useState<any>(null);
   const [limitReached, setLimitReached] = useState(false);
   const [step, setStep] = useState(1);
-  const [isLoading, setIsLoading] = useState(false);
-  const [loadingStep, setLoadingStep] = useState(0);
+  const [isExtracting, setIsExtracting] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [extractionStep, setExtractionStep] = useState(0);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const nameRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
