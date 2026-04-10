@@ -310,8 +310,7 @@ const Analyze = () => {
     checkAuth();
   }, [navigate]);
 
-
-    setForm((prev) => ({
+  const updateConsent = useCallback((field: keyof FormState['consent'], value: boolean) => {
       ...prev,
       consent: { ...prev.consent, [field]: value },
     }));
