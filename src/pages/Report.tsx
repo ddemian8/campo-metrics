@@ -348,81 +348,73 @@ const Report = () => {
           <>
             {/* SECTION 2 — Performance Score */}
             <div className="rounded-2xl border border-border/50 bg-card p-6 text-center">
-              <div className={cn("inline-flex flex-col items-center justify-center w-24 h-24 rounded-full border-2 mb-4", getScoreBg(report.performance_score))}>
-                <span className={cn("text-4xl font-bold", getScoreColor(report.performance_score))}>
-                  {report.performance_score}
+              <div className={cn("inline-flex flex-col items-center justify-center w-24 h-24 rounded-full border-2 mb-4", getScoreBg(report.performanceScore))}>
+                <span className={cn("text-4xl font-bold", getScoreColor(report.performanceScore))}>
+                  {report.performanceScore}
                 </span>
               </div>
-              <p className={cn("text-sm font-medium mb-1", getScoreColor(report.performance_score))}>
-                {report.score_label}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Top {100 - report.position_ranking_percentile}% of {session.position === "GK" ? "Goalkeepers" : session.position === "DEF" ? "Defenders" : session.position === "MID" ? "Midfielders" : "Forwards"}
+              <p className={cn("text-sm font-medium mb-1", getScoreColor(report.performanceScore))}>
+                {report.performanceScore >= 75 ? "Excellent Output" : report.performanceScore >= 50 ? "Solid Performance" : "Below Average"}
               </p>
               <p className="text-lg font-medium text-foreground mt-4">{report.headline}</p>
             </div>
 
-            {/* SECTION 3 — AI Narrative */}
+            {/* SECTION 3 — Executive Summary */}
             <div className="rounded-2xl border border-border/50 bg-card p-6">
-              <h3 className="text-sm font-semibold text-foreground mb-3">Session analysis</h3>
-              <p className="text-sm text-muted-foreground leading-[1.8]">{report.narrative}</p>
+              <h3 className="text-sm font-semibold text-foreground mb-3">Executive Summary</h3>
+              <p className="text-sm text-muted-foreground leading-[1.8]">{report.executiveSummary}</p>
             </div>
 
-            {/* SECTION 4 — Strengths & Improvements */}
+            {/* SECTION 4 — Key Metrics */}
+            <div className="rounded-2xl border border-border/50 bg-card p-6">
+              <h3 className="text-sm font-semibold text-foreground mb-4">Key Metrics</h3>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {report.keyMetrics?.map((m) => {
+                  const ratingColor = m.rating === "elite" ? "text-[#1db954]" : m.rating === "good" ? "text-primary" : m.rating === "average" ? "text-amber-400" : "text-red-400";
+                  return (
+                    <div key={m.label} className="rounded-lg bg-secondary p-3">
+                      <p className="text-[11px] text-muted-foreground">{m.label}</p>
+                      <p className="text-xl font-bold text-foreground">{m.value}</p>
+                      {m.per90 !== "N/A" && <p className="text-[10px] text-muted-foreground">Per 90: {m.per90}</p>}
+                      <p className="text-[10px] text-muted-foreground">Benchmark: {m.benchmark}</p>
+                      <span className={cn("text-[10px] font-semibold uppercase", ratingColor)}>{m.rating}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* SECTION 5 — Strengths & Improvements */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="rounded-2xl border border-border/50 bg-card p-5 border-l-[3px] border-l-[#1db954]">
-                <h3 className="text-sm font-semibold text-foreground mb-3">What went well</h3>
-                <ul className="space-y-2">
-                  {report.strengths.map((s, i) => (
-                    <li key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
-                      <Check className="h-4 w-4 text-[#1db954] shrink-0 mt-0.5" />
-                      {s}
-                    </li>
-                  ))}
-                </ul>
+                <h3 className="text-sm font-semibold text-foreground mb-2">{report.standoutStrength?.title}</h3>
+                <p className="text-sm text-muted-foreground">{report.standoutStrength?.explanation}</p>
               </div>
               <div className="rounded-2xl border border-border/50 bg-card p-5 border-l-[3px] border-l-amber-400">
-                <h3 className="text-sm font-semibold text-foreground mb-3">To work on</h3>
-                <ul className="space-y-2">
-                  {report.areas_to_improve.map((s, i) => (
-                    <li key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
-                      <ArrowRight className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
-                      {s}
-                    </li>
-                  ))}
-                </ul>
+                <h3 className="text-sm font-semibold text-foreground mb-2">{report.areaToImprove?.title}</h3>
+                <p className="text-sm text-muted-foreground">{report.areaToImprove?.explanation}</p>
               </div>
             </div>
 
-            {/* SECTION 5 — GPS Metrics Grid */}
-            <div className="rounded-2xl border border-border/50 bg-card p-6">
-              <h3 className="text-sm font-semibold text-foreground mb-4">GPS Metrics</h3>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                {metrics.map((m) => (
-                  <div key={m.label} className="rounded-lg bg-secondary p-3">
-                    <p className="text-[11px] text-muted-foreground">{m.label}</p>
-                    <p className="text-xl font-bold text-foreground">{m.value}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* SECTION 6 — Context notes */}
+            {/* SECTION 6 — Positional Context & Motivational Close */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="rounded-lg bg-secondary p-4">
-                <p className="text-[11px] text-muted-foreground mb-1">vs team average</p>
-                <p className="text-sm text-foreground font-medium">{report.vs_team_average}</p>
+                <p className="text-[11px] text-muted-foreground mb-1">positional context</p>
+                <p className="text-sm text-foreground font-medium">{report.positionalContext}</p>
               </div>
               <div className="rounded-lg bg-secondary p-4">
-                <p className="text-[11px] text-muted-foreground mb-1">session context</p>
-                <p className="text-sm text-foreground font-medium">{report.md_context_note}</p>
+                <p className="text-[11px] text-muted-foreground mb-1">motivational close</p>
+                <p className="text-sm text-foreground font-medium italic">{report.motivationalClose}</p>
               </div>
             </div>
 
-            {/* SECTION 7 — Next session recommendation */}
+            {/* SECTION 7 — Training Recommendation */}
             <div className="rounded-2xl border-l-[3px] border-l-primary bg-[#0d2a4a] p-5">
-              <p className="text-[12px] font-semibold text-primary mb-1">Recommendation for next session</p>
-              <p className="text-sm text-[#a8c0e0]">{report.next_session_recommendation}</p>
+              <p className="text-[12px] font-semibold text-primary mb-2">{report.trainingRecommendation?.title}</p>
+              <p className="text-sm text-[#a8c0e0] mb-1">{report.trainingRecommendation?.drill}</p>
+              <p className="text-[11px] text-muted-foreground">
+                {report.trainingRecommendation?.duration} · {report.trainingRecommendation?.intensity}
+              </p>
             </div>
           </>
         ) : (
