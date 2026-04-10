@@ -835,6 +835,130 @@ const Analyze = () => {
     );
   };
 
+  // Player confirmation/selection screen
+  if (playerMatchPhase === "confirm" && extractedPlayers.length > 0) {
+    const player = extractedPlayers[matchedPlayerIndex];
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4">
+        <div className="mb-8">
+          <span className="text-2xl font-bold tracking-tight">
+            <span className="text-foreground">Campo</span>
+            <span className="text-primary">metric</span>
+          </span>
+        </div>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="w-full max-w-md"
+        >
+          <div className="rounded-xl border border-border bg-card p-6 space-y-5">
+            <div className="text-center">
+              <Sparkles className="h-8 w-8 text-primary mx-auto mb-2" />
+              <h2 className="text-xl font-bold text-foreground">We found your data</h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                From {extractedPlayers.length} players in the PDF
+              </p>
+            </div>
+
+            <div className="rounded-lg bg-primary/10 border border-primary/30 p-4">
+              <p className="text-sm font-semibold text-primary mb-3">{player?.athlete_name}</p>
+              <div className="grid grid-cols-3 gap-3 text-center">
+                <div>
+                  <p className="text-xs text-muted-foreground">Distance</p>
+                  <p className="text-sm font-bold text-foreground">
+                    {player?.distance ? `${(player.distance / 1000).toFixed(1)} km` : "N/A"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Max Speed</p>
+                  <p className="text-sm font-bold text-foreground">
+                    {player?.max_sp ? `${player.max_sp.toFixed(1)} km/h` : "N/A"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Duration</p>
+                  <p className="text-sm font-bold text-foreground">
+                    {player?.duration || "N/A"}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <Button
+              onClick={() => handlePlayerConfirm(matchedPlayerIndex)}
+              className="w-full bg-[#1D9E75] hover:bg-[#178a64] text-white font-semibold h-12 text-base"
+            >
+              Generate report →
+            </Button>
+
+            <button
+              onClick={() => setPlayerMatchPhase("select")}
+              className="w-full text-sm text-muted-foreground hover:text-foreground transition-colors text-center"
+            >
+              Not me — pick another player
+            </button>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
+
+  if (playerMatchPhase === "select" && extractedPlayers.length > 0) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4 py-12">
+        <div className="mb-8">
+          <span className="text-2xl font-bold tracking-tight">
+            <span className="text-foreground">Campo</span>
+            <span className="text-primary">metric</span>
+          </span>
+        </div>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="w-full max-w-lg"
+        >
+          <div className="rounded-xl border border-border bg-card p-6 space-y-4">
+            <div className="text-center mb-2">
+              <h2 className="text-xl font-bold text-foreground">We found these players in your PDF</h2>
+              <p className="text-sm text-muted-foreground mt-1">Select your name to continue</p>
+            </div>
+
+            <div className="max-h-80 overflow-y-auto space-y-2 pr-1">
+              {extractedPlayers.map((player, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => handlePlayerConfirm(idx)}
+                  className="w-full text-left rounded-lg border border-border bg-background hover:border-primary hover:bg-primary/5 p-3 transition-colors"
+                >
+                  <p className="font-medium text-foreground text-sm">{player.athlete_name || "Unknown"}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {player.distance ? `${(player.distance / 1000).toFixed(1)} km` : "—"}
+                    {player.max_sp ? ` · ${player.max_sp.toFixed(1)} km/h` : ""}
+                    {player.duration ? ` · ${player.duration}` : ""}
+                  </p>
+                </button>
+              ))}
+            </div>
+
+            <div className="pt-2 border-t border-border">
+              <button
+                onClick={() => {
+                  setPlayerMatchPhase(null);
+                  setExtractedPlayers([]);
+                  updateForm({ entryMethod: "manual" });
+                  setExtractionError("Please enter your data manually instead.");
+                }}
+                className="w-full text-sm text-muted-foreground hover:text-foreground transition-colors text-center py-2"
+              >
+                Enter data manually instead
+              </button>
+            </div>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
+
   // Loading screen
   if (isLoading) {
     const lines = [
