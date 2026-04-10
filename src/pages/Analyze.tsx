@@ -136,6 +136,7 @@ const Analyze = () => {
   const [dragOver, setDragOver] = useState(false);
   const [extractionError, setExtractionError] = useState<string | null>(null);
   const sessionIdRef = useRef<string>("");
+  const [reportReady, setReportReady] = useState(false);
 
   const todayDay = String(now.getDate()).padStart(2, "0");
   const todayMonth = String(now.getMonth() + 1);
@@ -232,13 +233,19 @@ const Analyze = () => {
     for (let i = 1; i <= 7; i++) {
       timers.push(setTimeout(() => setLoadingStep(i), i * 1200));
     }
-    timers.push(
-      setTimeout(() => {
-        navigate(`/report/${sessionIdRef.current}`);
-      }, 8700)
-    );
     return () => timers.forEach(clearTimeout);
-  }, [isLoading, navigate]);
+  }, [isLoading]);
+
+  // Navigate when report is ready AND loading animation has progressed enough
+  useEffect(() => {
+    if (!reportReady || !isLoading) return;
+    // Ensure at least the last loading step is shown briefly
+    const minDelay = setTimeout(() => {
+      setLoadingStep(7);
+      setTimeout(() => navigate(`/report/${sessionIdRef.current}`), 800);
+    }, 500);
+    return () => clearTimeout(minDelay);
+  }, [reportReady, isLoading, navigate]);
 
   // Calculate DOB and age when dropdowns change
   useEffect(() => {
@@ -474,6 +481,9 @@ const Analyze = () => {
       }
 
       const anonymousToken = crypto.randomUUID();
+      localStorage.setItem(`report_token_${sessionId}`, anonymousToken);
+
+      // Save session first
       await supabase.from('anonymous_sessions').insert({
         id: sessionId,
         anonymous_token: anonymousToken,
@@ -507,8 +517,52 @@ const Analyze = () => {
         },
         status: 'processing',
       } as any);
+
+      // Call generate-report edge function
+      const { data: reportData, error: reportError } = await supabase.functions.invoke('generate-report', {
+        body: {
+          playerData: {
+            fullName: form.fullName,
+            position: form.position,
+            positionSpecific: form.positionSpecific,
+            sessionType: form.sessionType,
+            mdDay: form.mdDay,
+            opponent: form.opponent,
+            minutesPlayed: gpsMetrics.duration || null,
+            duration: gpsMetrics.duration || null,
+            distance: gpsMetrics.distance || null,
+            maxSpeed: gpsMetrics.max_sp || null,
+            avSpeed: gpsMetrics.av_sp || null,
+            spEv: gpsMetrics.sp_ev || null,
+            hmld: gpsMetrics.hmld || null,
+            distSpZ4: gpsMetrics.dist_sp_z4 || null,
+            distSpZ4Plus: gpsMetrics.dist_sp_z4plus || null,
+            distSpZ5: gpsMetrics.dist_sp_z5 || null,
+            accEv: gpsMetrics.acc_ev || null,
+            decEv: gpsMetrics.dec_ev || null,
+          },
+        },
+      });
+
+      if (reportError || !reportData?.success) {
+        console.error('Report generation failed:', reportError, reportData);
+        setIsLoading(false);
+        setExtractionError('Report generation failed. Please try again.');
+        return;
+      }
+
+      // Save the AI report to the anonymous session
+      await supabase.from('anonymous_sessions').update({
+        ai_report: reportData.report,
+        status: 'completed',
+      } as any).eq('id', sessionId);
+
+      setReportReady(true);
+
     } catch (err) {
-      console.error('Error saving session:', err);
+      console.error('Error in submission:', err);
+      setIsLoading(false);
+      setExtractionError('Something went wrong. Please try again.');
     }
   };
 
@@ -1278,8 +1332,7 @@ const Analyze = () => {
                     {(() => {
                       const m = form.manualData;
                       const allRequiredFilled = m.duration && m.distance && m.max_sp && m.sp_ev && m.hmld;
-                      const allConsent = form.consent.public_profile && form.consent.leaderboard && form.consent.terms;
-                      const canSubmit = allRequiredFilled && allConsent;
+                      const canSubmit = allRequiredFilled && form.consent.terms;
                       return (
                         <>
                           <Button
@@ -1347,8 +1400,7 @@ const Analyze = () => {
                     {renderConsentSection()}
 
                     {(() => {
-                      const allConsent = form.consent.public_profile && form.consent.leaderboard && form.consent.terms;
-                      const canSubmit = form.gpsFile && allConsent;
+                      const canSubmit = form.gpsFile && form.consent.terms;
                       return (
                         <>
                           <Button
