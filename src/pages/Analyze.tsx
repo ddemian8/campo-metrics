@@ -1071,16 +1071,12 @@ const Analyze = () => {
     );
   }
 
-  // Loading screen — single flow, auto-redirects when done
-  if (isLoading) {
+  // PDF extraction loading screen (step-by-step, 3 steps only)
+  if (isExtracting) {
     const lines = [
       "Reading your GPS data...",
       "Finding your player data...",
-      "Analyzing sprint patterns...",
-      "Comparing to position benchmarks...",
-      "Generating personalized insights...",
-      "Almost there...",
-      "Finalizing your report...",
+      "Analyzing session metrics...",
     ];
 
     return (
@@ -1094,9 +1090,9 @@ const Analyze = () => {
 
         <div className="space-y-4 w-full max-w-md">
           {lines.map((line, i) => {
-            const isActive = loadingStep === i + 1;
-            const isDone = loadingStep > i + 1;
-            const isVisible = loadingStep >= i + 1;
+            const isActive = extractionStep === i + 1;
+            const isDone = extractionStep > i + 1;
+            const isVisible = extractionStep >= i + 1;
             if (!isVisible) return null;
             return (
               <motion.div
@@ -1123,9 +1119,34 @@ const Analyze = () => {
           <motion.div
             className="h-full bg-primary"
             initial={{ width: "0%" }}
-            animate={{ width: `${Math.min((loadingStep / 7) * 100, 95)}%` }}
+            animate={{ width: `${Math.min((extractionStep / 3) * 100, 95)}%` }}
             transition={{ duration: 0.5, ease: "linear" }}
           />
+        </div>
+      </div>
+    );
+  }
+
+  // AI report generation screen (simple spinner)
+  if (isGenerating) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4">
+        <div className="mb-12">
+          <span className="text-2xl font-bold tracking-tight">
+            <span className="text-foreground">Campo</span>
+            <span className="text-primary">metric</span>
+          </span>
+        </div>
+
+        <div className="flex flex-col items-center gap-6">
+          <div className="relative">
+            <div className="h-16 w-16 rounded-full border-4 border-muted" />
+            <div className="absolute inset-0 h-16 w-16 rounded-full border-4 border-primary border-t-transparent animate-spin" />
+          </div>
+          <div className="text-center">
+            <p className="text-lg font-semibold text-foreground">Generating your AI report...</p>
+            <p className="text-sm text-muted-foreground mt-2">This usually takes 10–15 seconds</p>
+          </div>
         </div>
       </div>
     );
