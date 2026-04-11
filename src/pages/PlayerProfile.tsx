@@ -277,6 +277,7 @@ const PlayerProfile = () => {
                   {stats?.trust_score != null && stats.trust_score > 0 && (
                     <TrustStars score={stats.trust_score} showLabel size="md" />
                   )}
+                </div>
                 <p className="text-sm text-muted-foreground mt-1.5">
                   {[profile.current_club, profile.current_league, profile.country].filter(Boolean).join(" · ")}
                 </p>
