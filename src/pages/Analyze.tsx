@@ -744,7 +744,7 @@ const Analyze = () => {
         await supabase.from('player_stats_aggregate').update({
           [counterField]: (currentStats as any)[counterField] + 1,
           trust_score: trustScore,
-        }).eq('player_id', profile.id);
+        } as any).eq('player_id', profile.id);
       }
 
       // Save profile data if this was a first-time user with missing fields
