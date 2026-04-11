@@ -11,8 +11,8 @@ serve(async (req) => {
 
   try {
     const { playerData } = await req.json();
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+    const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
+    if (!ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY is not configured");
 
     const systemPrompt = `You are an elite football performance analyst working for Campometric, a GPS analytics platform. You analyze player match and training data and produce insightful, motivating, professional reports. You write like a top-tier sports scientist who also understands the player as a human. You are precise, never generic, and always normalize stats to per-90-minute values for fair comparison. You compare the player's output to elite benchmarks for their position. You identify ONE standout strength and ONE clear area for improvement. You ALWAYS respond ONLY in valid JSON, no markdown, no preamble. IMPORTANT: If some GPS metrics are missing (null), work with whatever data is available. Note which metrics were missing in your analysis but still produce a complete report. Never refuse to generate a report due to partial data.
 
@@ -93,16 +93,18 @@ GPS DATA: ${gpsData}
 
 Return ONLY the JSON object, nothing else.`;
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "x-api-key": ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "claude-sonnet-4-5-20250929",
+        max_tokens: 2000,
+        system: systemPrompt,
         messages: [
-          { role: "system", content: systemPrompt },
           { role: "user", content: userMessage },
         ],
       }),
@@ -115,14 +117,8 @@ Return ONLY the JSON object, nothing else.`;
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      if (response.status === 402) {
-        return new Response(JSON.stringify({ error: "AI credits exhausted. Please add funds." }), {
-          status: 402,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
       const t = await response.text();
-      console.error("AI Gateway error:", response.status, t);
+      console.error("Anthropic API error:", response.status, t);
       return new Response(JSON.stringify({ error: "AI API error", fallback: true }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -130,10 +126,10 @@ Return ONLY the JSON object, nothing else.`;
     }
 
     const aiData = await response.json();
-    const content = aiData.choices?.[0]?.message?.content;
+    const content = aiData.content?.[0]?.text;
 
     if (!content) {
-      console.error("No content in AI response:", JSON.stringify(aiData));
+      console.error("No content in Anthropic response:", JSON.stringify(aiData));
       return new Response(JSON.stringify({ error: "Empty AI response", fallback: true }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
