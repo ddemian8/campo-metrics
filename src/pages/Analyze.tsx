@@ -1529,10 +1529,7 @@ const Analyze = () => {
             {currentStepId === "gps_data" && (
               <div>
                 <div className="mb-8">
-                  <span className="text-2xl font-bold tracking-tight">
-                    <span className="text-foreground">Campo</span>
-                    <span className="text-primary">metric</span>
-                  </span>
+                  <img src={logo} alt="Campometric" className="h-10" />
                 </div>
 
                 {extractionError && (
