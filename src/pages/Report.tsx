@@ -119,6 +119,7 @@ const Report = () => {
             opponent: sess?.opponent,
             gps_data: gps,
             player_id: reportRow.player_id,
+            input_method: sess?.input_method || null,
           });
           setIsPublic(reportRow.is_public);
 
@@ -365,8 +366,11 @@ const Report = () => {
                 )}
               </div>
             </div>
-            <div className="text-[12px] text-muted-foreground bg-secondary rounded-lg px-3 py-2 shrink-0">
-              {sessionInfo}
+            <div className="flex items-center gap-3">
+              <div className="text-[12px] text-muted-foreground bg-secondary rounded-lg px-3 py-2 shrink-0">
+                {sessionInfo}
+              </div>
+              <DataSourceBadge inputMethod={session.input_method} size="md" />
             </div>
           </div>
         </div>
