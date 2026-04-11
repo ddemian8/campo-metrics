@@ -155,6 +155,18 @@ const Dashboard = () => {
           </div>
         )}
 
+        {/* Public profile link */}
+        {profile?.is_public && profile?.username && (
+          <div className="mb-6">
+            <Link
+              to={`/player/${profile.username}`}
+              className="text-sm text-[#1D9E75] hover:underline"
+            >
+              View your public profile →
+            </Link>
+          </div>
+        )}
+
         {/* Quick action */}
         <Button
           size="lg"

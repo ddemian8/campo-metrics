@@ -89,6 +89,7 @@ const Report = () => {
   const [isPublic, setIsPublic] = useState(false);
   const [comparison, setComparison] = useState<ComparisonMetric[] | null>(null);
   const [comparisonInsufficient, setComparisonInsufficient] = useState(false);
+  const [playerUsername, setPlayerUsername] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -117,6 +118,18 @@ const Report = () => {
             player_id: reportRow.player_id,
           });
           setIsPublic(reportRow.is_public);
+
+          // Fetch player username for public profile link
+          if (reportRow.player_id) {
+            const { data: playerProfile } = await supabase
+              .from("profiles")
+              .select("username, is_public")
+              .eq("id", reportRow.player_id)
+              .maybeSingle();
+            if (playerProfile?.is_public && playerProfile?.username) {
+              setPlayerUsername(playerProfile.username);
+            }
+          }
           if (reportRow.ai_report) {
             setReport(reportRow.ai_report as unknown as ReportData);
           } else {
@@ -311,7 +324,13 @@ const Report = () => {
                 <span className="text-lg font-bold text-primary">{initials}</span>
               </div>
               <div>
-                <h2 className="text-xl font-bold text-foreground">{fullName}</h2>
+                {playerUsername ? (
+                  <Link to={`/player/${playerUsername}`} className="hover:underline">
+                    <h2 className="text-xl font-bold text-foreground">{fullName}</h2>
+                  </Link>
+                ) : (
+                  <h2 className="text-xl font-bold text-foreground">{fullName}</h2>
+                )}
                 <div className="flex flex-wrap items-center gap-2 mt-1">
                   {session.position && (
                     <span className={cn("text-[11px] font-semibold px-2 py-0.5 rounded-full", positionColors[session.position] || "bg-muted text-muted-foreground")}>
