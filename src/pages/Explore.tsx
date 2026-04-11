@@ -277,7 +277,10 @@ const Explore = () => {
                 >
                   <span className="text-sm font-bold text-muted-foreground w-8 text-right">#{i + 1}</span>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">{p.full_name}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium text-foreground truncate">{p.full_name}</p>
+                      {p.trust_score > 0 && <TrustStars score={p.trust_score} size="sm" />}
+                    </div>
                     <p className="text-xs text-muted-foreground truncate">
                       {p.position_specific || p.position} · {p.current_club} · {p.country}
                     </p>
