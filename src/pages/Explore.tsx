@@ -240,18 +240,33 @@ const Explore = () => {
             <h2 className="text-xl font-bold text-foreground mb-4">Leaderboard</h2>
             <div className="flex items-center gap-4 mb-4">
               <div className="flex gap-2">
-              {SORT_OPTIONS.map((opt) => (
+                {SORT_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    onClick={() => setLeaderboardTab(opt.value)}
+                    className={cn(
+                      "px-4 py-2 rounded-lg text-sm font-medium transition-colors",
+                      leaderboardTab === opt.value ? "bg-[#1D9E75] text-white" : "bg-card text-muted-foreground border border-border hover:text-foreground"
+                    )}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+              <div className="flex gap-2 ml-auto">
                 <button
-                  key={opt.value}
-                  onClick={() => setLeaderboardTab(opt.value)}
-                  className={cn(
-                    "px-4 py-2 rounded-lg text-sm font-medium transition-colors",
-                    leaderboardTab === opt.value ? "bg-[#1D9E75] text-white" : "bg-card text-muted-foreground border border-border hover:text-foreground"
-                  )}
+                  onClick={() => setPdfOnlyFilter(false)}
+                  className={cn("px-3 py-1.5 rounded-md text-xs font-medium transition-colors", !pdfOnlyFilter ? "bg-secondary text-foreground" : "text-muted-foreground hover:text-foreground")}
                 >
-                  {opt.label}
+                  All players
                 </button>
-              ))}
+                <button
+                  onClick={() => setPdfOnlyFilter(true)}
+                  className={cn("px-3 py-1.5 rounded-md text-xs font-medium transition-colors", pdfOnlyFilter ? "bg-[#1D9E75]/20 text-[#1D9E75]" : "text-muted-foreground hover:text-foreground")}
+                >
+                  PDF Verified only
+                </button>
+              </div>
             </div>
             <div className="rounded-xl border border-border bg-card divide-y divide-border">
               {leaderboard.map((p, i) => (
