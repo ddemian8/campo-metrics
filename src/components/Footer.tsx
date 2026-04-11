@@ -45,7 +45,7 @@ const Footer = () => (
       <div className="grid grid-cols-2 md:grid-cols-5 gap-8">
         <div className="col-span-2 md:col-span-1">
           <Link to="/" className="flex items-center">
-            <img src={logo} alt="Campometric" className="h-6" />
+            <img src={logo} alt="Campometric" className="h-[54px]" />
           </Link>
         </div>
         {columns.map((col) => (

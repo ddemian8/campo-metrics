@@ -1042,7 +1042,7 @@ const Analyze = () => {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4 text-center">
         <div className="mb-8">
-          <img src={logo} alt="Campometric" className="h-10" />
+          <img src={logo} alt="Campometric" className="h-[54px]" />
         </div>
         <Lock className="h-12 w-12 text-muted-foreground mb-4" />
         <h1 className="text-2xl font-bold text-foreground mb-2">You've used all 3 free reports this month</h1>
@@ -1070,7 +1070,7 @@ const Analyze = () => {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4">
         <div className="mb-8">
-          <img src={logo} alt="Campometric" className="h-10" />
+          <img src={logo} alt="Campometric" className="h-[54px]" />
         </div>
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-lg">
           <div className="rounded-xl border border-border bg-card p-6 space-y-5">
@@ -1106,7 +1106,7 @@ const Analyze = () => {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4 py-12">
         <div className="mb-8">
-          <img src={logo} alt="Campometric" className="h-10" />
+          <img src={logo} alt="Campometric" className="h-[54px]" />
         </div>
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-lg">
           <div className="rounded-xl border border-border bg-card p-6 space-y-4">
@@ -1160,7 +1160,7 @@ const Analyze = () => {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4">
         <div className="mb-12">
-          <img src={logo} alt="Campometric" className="h-10" />
+          <img src={logo} alt="Campometric" className="h-[54px]" />
         </div>
 
         <div className="space-y-4 w-full max-w-md">
@@ -1207,7 +1207,7 @@ const Analyze = () => {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4">
         <div className="mb-12">
-          <img src={logo} alt="Campometric" className="h-10" />
+          <img src={logo} alt="Campometric" className="h-[54px]" />
         </div>
 
         <div className="flex flex-col items-center gap-6">
@@ -1229,7 +1229,7 @@ const Analyze = () => {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4 text-center">
         <div className="mb-8">
-          <img src={logo} alt="Campometric" className="h-10" />
+          <img src={logo} alt="Campometric" className="h-[54px]" />
         </div>
         <AlertTriangle className="h-12 w-12 text-amber-400 mb-4" />
         <h1 className="text-xl font-bold text-foreground mb-2">{generationError}</h1>
@@ -1529,7 +1529,7 @@ const Analyze = () => {
             {currentStepId === "gps_data" && (
               <div>
                 <div className="mb-8">
-                  <img src={logo} alt="Campometric" className="h-10" />
+                  <img src={logo} alt="Campometric" className="h-[54px]" />
                 </div>
 
                 {extractionError && (

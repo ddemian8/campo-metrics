@@ -74,7 +74,7 @@ const Signup = () => {
       <div className="w-full max-w-md">
         {/* Logo */}
         <Link to="/" className="block text-center mb-8">
-          <img src={logo} alt="Campometric" className="h-10 mx-auto" />
+          <img src={logo} alt="Campometric" className="h-[54px] mx-auto" />
         </Link>
 
         {/* Card */}
