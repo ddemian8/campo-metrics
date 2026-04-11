@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import logo from "@/assets/logo.svg";
 
 const columns = [
   {
@@ -43,9 +44,8 @@ const Footer = () => (
     <div className="container">
       <div className="grid grid-cols-2 md:grid-cols-5 gap-8">
         <div className="col-span-2 md:col-span-1">
-          <Link to="/" className="text-lg font-bold">
-            <span className="text-foreground">Campo</span>
-            <span className="text-primary">metric</span>
+          <Link to="/" className="flex items-center">
+            <img src={logo} alt="Campometric" className="h-6" />
           </Link>
         </div>
         {columns.map((col) => (
