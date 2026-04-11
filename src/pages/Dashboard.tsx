@@ -3,7 +3,6 @@ import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Loader2, Plus, LogOut, ChevronRight, Crown } from "lucide-react";
-import { Loader2, Plus, LogOut, ChevronRight, Crown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface ReportRow {
