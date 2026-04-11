@@ -97,11 +97,11 @@ const PlayerProfile = () => {
       // Fetch profile
       const { data: p } = await supabase
         .from("profiles")
-        .select("id, full_name, username, avatar_url, date_of_birth, height_cm, weight_kg, position, position_specific, current_club, current_league, country, transfermarkt_url, preferred_foot, is_public")
+        .select("id, full_name, username, avatar_url, date_of_birth, height_cm, weight_kg, position, position_specific, current_club, current_league, country, transfermarkt_url, preferred_foot, subscription_plan, account_type")
         .eq("username", username)
         .maybeSingle();
 
-      if (!p || !(p as any).is_public) {
+      if (!p) {
         setNotFound(true);
         setLoading(false);
         return;
@@ -116,7 +116,6 @@ const PlayerProfile = () => {
           .from("reports")
           .select("id, session_id, ai_report, created_at, sessions(session_type, session_date, opponent, training_day, input_method)")
           .eq("player_id", p.id)
-          .eq("is_public", true)
           .order("created_at", { ascending: false })
           .limit(5),
       ]);
@@ -129,7 +128,6 @@ const PlayerProfile = () => {
         .from("reports")
         .select("ai_report, created_at, sessions(session_date)")
         .eq("player_id", p.id)
-        .eq("is_public", true)
         .order("created_at", { ascending: true })
         .limit(20);
 
@@ -154,10 +152,9 @@ const PlayerProfile = () => {
           const pIds = allStats.map((s) => s.player_id);
           const { data: posProfiles } = await supabase
             .from("profiles")
-            .select("id, position_specific, is_public")
+            .select("id, position_specific")
             .in("id", pIds)
-            .eq("position_specific", p.position_specific)
-            .eq("is_public", true);
+            .eq("position_specific", p.position_specific);
 
           if (posProfiles && posProfiles.length > 1) {
             const posIds = new Set(posProfiles.map((pp) => pp.id));
@@ -220,7 +217,7 @@ const PlayerProfile = () => {
         <Navbar />
         <div className="container max-w-lg pt-32 text-center">
           <h1 className="text-2xl font-bold text-foreground mb-3">Player not found</h1>
-          <p className="text-muted-foreground mb-6">This player profile is private or doesn't exist.</p>
+          <p className="text-muted-foreground mb-6">This player profile doesn't exist.</p>
           <Button className="bg-[#1D9E75] hover:bg-[#178a64] text-white" onClick={() => navigate("/explore")}>
             Explore other players →
           </Button>
@@ -267,7 +264,12 @@ const PlayerProfile = () => {
                 </AvatarFallback>
               </Avatar>
               <div>
-                <h1 className="text-2xl md:text-3xl font-bold text-foreground">{profile.full_name}</h1>
+                <h1 className="text-2xl md:text-3xl font-bold text-foreground">
+                  {profile.full_name}
+                  {((profile as any).subscription_plan !== "free" || (profile as any).account_type !== "free") && (
+                    <span className="ml-2 text-[11px] font-bold text-white bg-[#1D9E75] px-2 py-0.5 rounded-full align-middle">Pro</span>
+                  )}
+                </h1>
                 <div className="flex items-center gap-2 mt-1.5">
                   {profile.position_specific && (
                     <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-[#1D9E75] text-white">

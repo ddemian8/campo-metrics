@@ -38,9 +38,8 @@ const BrowsePlayers = () => {
       const playerIds = statsData.map((s) => s.player_id);
       const { data: profiles } = await supabase
         .from("profiles")
-        .select("id, full_name, position, position_specific, current_club, country, is_public")
-        .in("id", playerIds)
-        .eq("is_public", true);
+        .select("id, full_name, position, position_specific, current_club, country")
+        .in("id", playerIds);
 
       if (!profiles) return;
 

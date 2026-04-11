@@ -38,7 +38,7 @@ const Settings = () => {
   const [country, setCountry] = useState("");
   const [transfermarktUrl, setTransfermarktUrl] = useState("");
   const [username, setUsername] = useState("");
-  const [isPublic, setIsPublic] = useState(false);
+  const [isPublic] = useState(true);
   const [avatarUrl, setAvatarUrl] = useState("");
 
   // Username validation
@@ -80,7 +80,7 @@ const Settings = () => {
         setCountry(p.country || "");
         setTransfermarktUrl(p.transfermarkt_url || "");
         setUsername(p.username || "");
-        setIsPublic(p.is_public || false);
+        // is_public is always true — no toggle needed
         setAvatarUrl(p.avatar_url || "");
       }
       setLoading(false);
@@ -127,13 +127,6 @@ const Settings = () => {
     if (!profile) return;
     if (username && usernameAvailable === false) {
       toast.error("This username is already taken");
-      return;
-    }
-
-    // If free user tries to enable public
-    if (isPublic && profile.subscription_plan === "free" && profile.account_type === "free") {
-      toast.error("Upgrade to Player Pro to make your profile public");
-      setIsPublic(false);
       return;
     }
 
@@ -329,9 +322,9 @@ const Settings = () => {
           </div>
         </section>
 
-        {/* Section 3 — Username & Public */}
+        {/* Section 3 — Username */}
         <section className="mb-10">
-          <h2 className="text-lg font-semibold text-foreground mb-5">Username & Public Profile</h2>
+          <h2 className="text-lg font-semibold text-foreground mb-5">Username & Profile URL</h2>
           <div className="grid gap-4">
             <div>
               <Label>Username</Label>
@@ -359,25 +352,11 @@ const Settings = () => {
               </p>
             </div>
 
-            <div className="flex items-center justify-between rounded-lg border border-border bg-card p-4">
-              <div>
-                <p className="text-sm font-medium text-foreground">Public Profile</p>
-                <p className="text-xs text-muted-foreground">
-                  {profile?.subscription_plan === "free" && profile?.account_type === "free"
-                    ? "Upgrade to Player Pro to make your profile public"
-                    : "Visible on Explore page and to scouts"}
-                </p>
-              </div>
-              <Switch
-                checked={isPublic}
-                onCheckedChange={(checked) => {
-                  if (checked && profile?.subscription_plan === "free" && profile?.account_type === "free") {
-                    toast.error("Upgrade to Player Pro to make your profile public");
-                    return;
-                  }
-                  setIsPublic(checked);
-                }}
-              />
+            <div className="rounded-lg border border-border bg-card p-4">
+              <p className="text-sm font-medium text-foreground">Your profile is public</p>
+              <p className="text-xs text-muted-foreground">
+                All Campometric profiles are visible on the leaderboard and player directory.
+              </p>
             </div>
           </div>
         </section>

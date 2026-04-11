@@ -33,6 +33,7 @@ interface PlayerCard {
   trust_score: number;
   pdf_session_count: number;
   total_sessions_count: number;
+  isPro: boolean;
 }
 
 const countryFlag = (country: string) => {
@@ -65,10 +66,10 @@ const Explore = () => {
     const fetchPlayers = async () => {
       setLoading(true);
 
+      // Fetch ALL profiles (all are public now)
       const { data: profiles } = await supabase
         .from("profiles")
-        .select("id, username, full_name, position, position_specific, current_club, country, is_public")
-        .eq("is_public", true);
+        .select("id, username, full_name, position, position_specific, current_club, country, subscription_plan, account_type");
 
       if (!profiles || profiles.length === 0) {
         setPlayers([]);
@@ -86,6 +87,7 @@ const Explore = () => {
 
       const merged: PlayerCard[] = profiles.map((p) => {
         const s = statsMap.get(p.id);
+        const isPro = (p as any).subscription_plan !== "free" || (p as any).account_type !== "free";
         return {
           id: p.id,
           username: p.username,
@@ -101,6 +103,7 @@ const Explore = () => {
           trust_score: Number(s?.trust_score) || 0,
           pdf_session_count: Number(s?.pdf_session_count) || 0,
           total_sessions_count: Number(s?.total_sessions) || 0,
+          isPro,
         };
       });
 
@@ -229,12 +232,12 @@ const Explore = () => {
           <div className="text-center py-16 text-muted-foreground">Loading players...</div>
         ) : filtered.length === 0 ? (
           <div className="rounded-xl border border-border bg-card p-12 text-center">
-            <p className="text-foreground font-medium mb-2">No public players yet</p>
+            <p className="text-foreground font-medium mb-2">No players with reports yet</p>
             <p className="text-sm text-muted-foreground mb-4">
-              Be the first — upgrade to Player Pro to appear here.
+              Be the first — upload your GPS data to appear here.
             </p>
-            <Button className="bg-[#1D9E75] hover:bg-[#178a64] text-white" onClick={() => navigate("/#pricing")}>
-              Go Pro — €9/month
+            <Button className="bg-[#1D9E75] hover:bg-[#178a64] text-white" onClick={() => navigate("/analyze")}>
+              Analyze your GPS data →
             </Button>
           </div>
         ) : (
@@ -245,11 +248,14 @@ const Explore = () => {
                 onClick={() => navigate(p.username ? `/player/${p.username}` : "#")}
                 className="text-left rounded-xl border border-border bg-card hover:border-[#1D9E75]/50 p-5 transition-colors"
               >
-                <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-start justify-between mb-3">
                   <div>
                     <div className="flex items-center gap-1.5">
                       <span className="text-sm">{countryFlag(p.country)}</span>
                       <p className="font-semibold text-foreground">{p.full_name}</p>
+                      {p.isPro && (
+                        <span className="text-[9px] font-bold text-white bg-[#1D9E75] px-1.5 py-0.5 rounded-full">Pro</span>
+                      )}
                     </div>
                     <p className="text-xs text-muted-foreground">{p.current_club} · {p.country}</p>
                   </div>

@@ -135,30 +135,21 @@ const Dashboard = () => {
                   3 of 3 reports used this month. Resets on {resetDateStr}.
                 </p>
                 <p className="text-xs text-muted-foreground mb-3">
-                  Want unlimited reports + public profile? Upgrade to Pro — €9/month
+                  Want unlimited reports + Pro badge? Upgrade to Pro — €9/month
                 </p>
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    onClick={() => navigate("/#pricing")}
-                    className="bg-[#1D9E75] hover:bg-[#178a64] text-white font-semibold h-9 px-5 text-sm"
-                  >
-                    Upgrade to Pro →
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => navigate("/#pricing")}
-                  >
-                    Generate reports without limits
-                  </Button>
-                </div>
+                <Button
+                  onClick={() => navigate("/#pricing")}
+                  className="bg-[#1D9E75] hover:bg-[#178a64] text-white font-semibold h-9 px-5 text-sm"
+                >
+                  Upgrade to Pro →
+                </Button>
               </div>
             </div>
           </div>
         )}
 
         {/* Public profile link */}
-        {profile?.is_public && profile?.username && (
+        {profile?.username && (
           <div className="mb-6">
             <Link
               to={`/player/${profile.username}`}
