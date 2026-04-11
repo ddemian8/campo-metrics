@@ -1307,6 +1307,9 @@ const Analyze = () => {
                     </button>
                   ))}
                 </div>
+                <p className="text-xs text-muted-foreground text-center mt-4">
+                  🏆 Only PDF uploads qualify for leaderboard ranking
+                </p>
               </div>
             )}
 
