@@ -12,6 +12,8 @@ import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Dot,
 } from "recharts";
 import Navbar from "@/components/Navbar";
+import { DataSourceBadge } from "@/components/DataSourceBadge";
+import { TrustStars } from "@/components/TrustStars";
 
 interface ProfileData {
   id: string;
@@ -43,6 +45,7 @@ interface StatsData {
   total_sessions: number;
   total_matches: number;
   total_trainings: number;
+  trust_score: number;
 }
 
 interface ReportRow {
@@ -55,6 +58,7 @@ interface ReportRow {
     session_date: string;
     opponent: string | null;
     training_day: string | null;
+    input_method: string | null;
   } | null;
 }
 
