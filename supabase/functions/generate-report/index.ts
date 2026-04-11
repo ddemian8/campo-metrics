@@ -32,7 +32,17 @@ CPI Scoring scale:
 30-44 = Below average
 0-29 = Needs improvement
 
-Return the CPI as 'cpi' in the JSON response. Do NOT include 'performanceScore' or 'trainingRecommendation' in the response.`;
+Return the CPI as 'cpi' in the JSON response. Do NOT include 'performanceScore' or 'trainingRecommendation' in the response.
+
+ANOMALY DETECTION: Before generating the report, check if the GPS data seems realistic for the player's stated position and minutes played. Flag any suspicious metrics in a new field 'dataFlags' in your JSON response.
+
+Examples of flags:
+- A goalkeeper with 12km total distance in 90 minutes → flag: 'Unusually high distance for GK'
+- A player with 35+ km/h top speed in a lower league → flag: 'Top speed unusually high — verify data source'
+- Sprint distance higher than 20% of total distance → flag: 'Sprint-to-distance ratio unusually high'
+- 0 accelerations but high sprint count → flag: 'Inconsistent acceleration vs sprint data'
+
+Return dataFlags as an array of strings. If no anomalies, return empty array [].`;
 
     const gpsData = JSON.stringify({
       duration: playerData.duration || null,
@@ -67,7 +77,8 @@ Analyze this match/training performance and return a JSON object with this exact
   "standoutStrength": {"title": "...", "explanation": "2-3 sentences"},
   "areaToImprove": {"title": "...", "explanation": "2-3 sentences"},
   "positionalContext": "1-2 sentences comparing to elite players in same position",
-  "motivationalClose": "One powerful closing sentence the player will remember"
+  "motivationalClose": "One powerful closing sentence the player will remember",
+  "dataFlags": ["array of anomaly flag strings, or empty array if none"]
 }
 
 IMPORTANT: If some metrics are null/missing, still generate the report using available data. For missing metrics, use "N/A" as the value and "insufficient data" as the rating. Note any data gaps in the executive summary.
