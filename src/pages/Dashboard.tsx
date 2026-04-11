@@ -88,7 +88,7 @@ const Dashboard = () => {
       <nav className="border-b border-border/50 bg-background/80 backdrop-blur-xl">
         <div className="container flex h-16 items-center justify-between">
           <Link to="/" className="flex items-center">
-            <img src={logo} alt="Campometric" className="h-10" />
+            <img src={logo} alt="Campometric" className="h-[54px]" />
           </Link>
           <div className="flex items-center gap-3">
             <span className="text-sm text-muted-foreground hidden sm:block">

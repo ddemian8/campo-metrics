@@ -59,7 +59,7 @@ const Login = () => {
     <div className="min-h-screen bg-background flex items-center justify-center px-4 py-12">
       <div className="w-full max-w-md">
         <Link to="/" className="block text-center mb-8">
-          <img src={logo} alt="Campometric" className="h-10 mx-auto" />
+          <img src={logo} alt="Campometric" className="h-[54px] mx-auto" />
         </Link>
 
         <div className="rounded-xl border border-border bg-card p-8">
