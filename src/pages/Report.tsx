@@ -187,8 +187,7 @@ const Report = () => {
       const { data: posProfiles } = await supabase
         .from("profiles")
         .select("id, position_specific")
-        .eq("position_specific", posSpec)
-        .eq("is_public", true);
+        .eq("position_specific", posSpec);
 
       if (!posProfiles || posProfiles.length < 5) {
         setComparisonInsufficient(true);
