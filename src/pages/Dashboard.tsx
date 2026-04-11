@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Loader2, Plus, LogOut, ChevronRight, Crown } from "lucide-react";
+import { Loader2, Plus, LogOut, ChevronRight, Crown, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface ReportRow {
@@ -92,6 +92,9 @@ const Dashboard = () => {
             <span className="text-sm text-muted-foreground hidden sm:block">
               {profile?.full_name || "Player"}
             </span>
+            <Button variant="ghost" size="sm" onClick={() => navigate("/settings")}>
+              <Settings size={16} />
+            </Button>
             <Button variant="ghost" size="sm" onClick={handleLogout}>
               <LogOut size={16} className="mr-1" /> Log out
             </Button>
