@@ -14,7 +14,25 @@ serve(async (req) => {
     const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
     if (!ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY is not configured");
 
-    const systemPrompt = `You are an elite football performance analyst working for Campometric, a GPS analytics platform. You analyze player match and training data and produce insightful, motivating, professional reports. You write like a top-tier sports scientist who also understands the player as a human. You are precise, never generic, and always normalize stats to per-90-minute values for fair comparison. You compare the player's output to elite benchmarks for their position. You identify ONE standout strength and ONE clear area for improvement. You finish with one specific, actionable training recommendation for the next session. You ALWAYS respond ONLY in valid JSON, no markdown, no preamble. IMPORTANT: If some GPS metrics are missing (null), work with whatever data is available. Note which metrics were missing in your analysis but still produce a complete report. Never refuse to generate a report due to partial data.`;
+    const systemPrompt = `You are an elite football performance analyst working for Campometric, a GPS analytics platform. You analyze player match and training data and produce insightful, motivating, professional reports. You write like a top-tier sports scientist who also understands the player as a human. You are precise, never generic, and always normalize stats to per-90-minute values for fair comparison. You compare the player's output to elite benchmarks for their position. You identify ONE standout strength and ONE clear area for improvement. You ALWAYS respond ONLY in valid JSON, no markdown, no preamble. IMPORTANT: If some GPS metrics are missing (null), work with whatever data is available. Note which metrics were missing in your analysis but still produce a complete report. Never refuse to generate a report due to partial data.
+
+Calculate a Campometric Performance Index (CPI) score from 0-100 based on the player's GPS data. The CPI is a weighted composite score comparing the player's per-90 normalized metrics against elite benchmarks for their specific position.
+
+Weights by position zone:
+- DEF (CB, RB, LB, RWB, LWB): Distance/90 20%, HSR/90 15%, Sprint Distance/90 15%, Top Speed 10%, Accelerations/90 20%, Decelerations/90 20%
+- MID (CDM, CM, CAM, RM, LM): Distance/90 25%, HSR/90 20%, Sprint Distance/90 15%, Top Speed 10%, Accelerations/90 15%, Decelerations/90 15%
+- FWD (ST, SS, RW, LW, CF): Distance/90 15%, HSR/90 20%, Sprint Distance/90 25%, Top Speed 20%, Accelerations/90 10%, Decelerations/90 10%
+- GK: Distance/90 10%, HSR/90 10%, Sprint Distance/90 10%, Top Speed 15%, Accelerations/90 25%, Decelerations/90 30%
+
+CPI Scoring scale:
+90-100 = Elite (top 5% professional level)
+75-89 = Excellent
+60-74 = Good
+45-59 = Average
+30-44 = Below average
+0-29 = Needs improvement
+
+Return the CPI as 'cpi' in the JSON response. Do NOT include 'performanceScore' or 'trainingRecommendation' in the response.`;
 
     const gpsData = JSON.stringify({
       duration: playerData.duration || null,
@@ -37,7 +55,7 @@ Analyze this match/training performance and return a JSON object with this exact
 {
   "headline": "A short punchy 6-10 word headline capturing the performance",
   "executiveSummary": "2-3 sentences summarizing the session in a motivating tone",
-  "performanceScore": <number 0-100>,
+  "cpi": <number 0-100>,
   "keyMetrics": [
     {"label": "Total Distance", "value": "...", "per90": "...", "benchmark": "...", "rating": "elite|good|average|below"},
     {"label": "Sprint Distance", "value": "...", "per90": "...", "benchmark": "...", "rating": "..."},
@@ -48,7 +66,6 @@ Analyze this match/training performance and return a JSON object with this exact
   ],
   "standoutStrength": {"title": "...", "explanation": "2-3 sentences"},
   "areaToImprove": {"title": "...", "explanation": "2-3 sentences"},
-  "trainingRecommendation": {"title": "...", "drill": "specific drill name and description", "duration": "e.g. 20 minutes", "intensity": "e.g. 75% max HR"},
   "positionalContext": "1-2 sentences comparing to elite players in same position",
   "motivationalClose": "One powerful closing sentence the player will remember"
 }
@@ -73,7 +90,7 @@ Return ONLY the JSON object, nothing else.`;
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-5",
+        model: "claude-sonnet-4-5-20250514",
         max_tokens: 2000,
         system: systemPrompt,
         messages: [
