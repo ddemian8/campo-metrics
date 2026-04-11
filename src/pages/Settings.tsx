@@ -351,7 +351,11 @@ const Settings = () => {
                 )}
               </div>
               <p className="text-xs text-muted-foreground mt-1.5">
-                Your public profile: campometric.io/player/{username || "your-username"}
+                {username ? (
+                  <>Your public profile: <a href={`/player/${username}`} className="text-[#1D9E75] hover:underline">campometric.io/player/{username}</a></>
+                ) : (
+                  "Set your username to enable your public profile URL"
+                )}
               </p>
             </div>
 
