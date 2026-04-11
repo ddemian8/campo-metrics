@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import Navbar from "@/components/Navbar";
+import { TrustStars } from "@/components/TrustStars";
 
 const ALL_POSITIONS = ["GK", "CB", "RB", "LB", "RWB", "LWB", "CDM", "CM", "CAM", "RM", "LM", "ST", "SS", "RW", "LW", "CF"];
 const SORT_OPTIONS = [
@@ -29,6 +30,9 @@ interface PlayerCard {
   top_speed: number;
   distance_per90: number;
   sprint_per90: number;
+  trust_score: number;
+  pdf_session_count: number;
+  total_sessions_count: number;
 }
 
 const Explore = () => {
@@ -40,6 +44,7 @@ const Explore = () => {
   const [players, setPlayers] = useState<PlayerCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [leaderboardTab, setLeaderboardTab] = useState<SortKey>("cpi");
+  const [pdfOnlyFilter, setPdfOnlyFilter] = useState(false);
 
   useEffect(() => {
     const fetchPlayers = async () => {
@@ -59,7 +64,7 @@ const Explore = () => {
       const ids = profiles.map((p) => p.id);
       const { data: stats } = await supabase
         .from("player_stats_aggregate")
-        .select("player_id, avg_performance_score, best_top_speed, avg_distance_per90, avg_sprint_distance_per90")
+        .select("player_id, avg_performance_score, best_top_speed, avg_distance_per90, avg_sprint_distance_per90, trust_score, pdf_session_count, total_sessions")
         .in("player_id", ids);
 
       const statsMap = new Map(stats?.map((s) => [s.player_id, s]) || []);
@@ -78,6 +83,9 @@ const Explore = () => {
           top_speed: Number(s?.best_top_speed) || 0,
           distance_per90: Number(s?.avg_distance_per90) || 0,
           sprint_per90: Number(s?.avg_sprint_distance_per90) || 0,
+          trust_score: Number(s?.trust_score) || 0,
+          pdf_session_count: Number(s?.pdf_session_count) || 0,
+          total_sessions_count: Number(s?.total_sessions) || 0,
         };
       });
 
