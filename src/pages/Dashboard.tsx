@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Loader2, Plus, LogOut, ChevronRight, Crown, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { DataSourceBadge } from "@/components/DataSourceBadge";
 
 interface ReportRow {
   id: string;
@@ -16,6 +17,7 @@ interface ReportRow {
     session_date: string;
     opponent: string | null;
     training_day: string | null;
+    input_method: string | null;
   } | null;
 }
 
@@ -44,7 +46,7 @@ const Dashboard = () => {
       if (profileData) {
         const { data: reportData } = await supabase
           .from("reports")
-          .select("id, session_id, ai_report, is_public, created_at, sessions(session_type, session_date, opponent, training_day)")
+          .select("id, session_id, ai_report, is_public, created_at, sessions(session_type, session_date, opponent, training_day, input_method)")
           .eq("player_id", profileData.id)
           .order("created_at", { ascending: false })
           .limit(50);
@@ -194,6 +196,7 @@ const Dashboard = () => {
                 const sessionDate = sess?.session_date;
                 const opponent = sess?.opponent;
                 const trainingDay = sess?.training_day;
+                const inputMethod = sess?.input_method;
 
                 const scoreColor = cpiScore >= 75 ? "text-[#1D9E75]" : cpiScore >= 45 ? "text-amber-400" : "text-red-400";
 
@@ -227,7 +230,10 @@ const Dashboard = () => {
 
                     {/* Info */}
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-foreground truncate">{contextLine}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium text-foreground truncate">{contextLine}</p>
+                        <DataSourceBadge inputMethod={inputMethod} />
+                      </div>
                       {formattedDate && (
                         <p className="text-xs text-muted-foreground mt-0.5">{formattedDate}</p>
                       )}
