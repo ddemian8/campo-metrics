@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
+import logo from "@/assets/logo.svg";
 
 const Signup = () => {
   const navigate = useNavigate();
@@ -73,10 +74,7 @@ const Signup = () => {
       <div className="w-full max-w-md">
         {/* Logo */}
         <Link to="/" className="block text-center mb-8">
-          <span className="text-2xl font-bold tracking-tight">
-            <span className="text-foreground">Campo</span>
-            <span className="text-primary">metric</span>
-          </span>
+          <img src={logo} alt="Campometric" className="h-10 mx-auto" />
         </Link>
 
         {/* Card */}
