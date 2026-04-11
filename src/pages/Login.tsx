@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import logo from "@/assets/logo.svg";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 
 const Login = () => {
@@ -58,10 +59,7 @@ const Login = () => {
     <div className="min-h-screen bg-background flex items-center justify-center px-4 py-12">
       <div className="w-full max-w-md">
         <Link to="/" className="block text-center mb-8">
-          <span className="text-2xl font-bold tracking-tight">
-            <span className="text-foreground">Campo</span>
-            <span className="text-primary">metric</span>
-          </span>
+          <img src={logo} alt="Campometric" className="h-10 mx-auto" />
         </Link>
 
         <div className="rounded-xl border border-border bg-card p-8">

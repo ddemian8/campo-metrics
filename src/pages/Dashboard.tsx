@@ -3,6 +3,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Loader2, Plus, LogOut, ChevronRight, Crown, Settings } from "lucide-react";
+import logo from "@/assets/logo.svg";
 import { cn } from "@/lib/utils";
 import { DataSourceBadge } from "@/components/DataSourceBadge";
 
@@ -86,9 +87,8 @@ const Dashboard = () => {
     <div className="min-h-screen bg-background">
       <nav className="border-b border-border/50 bg-background/80 backdrop-blur-xl">
         <div className="container flex h-16 items-center justify-between">
-          <Link to="/" className="text-xl font-bold tracking-tight">
-            <span className="text-foreground">Campo</span>
-            <span className="text-primary">metric</span>
+          <Link to="/" className="flex items-center">
+            <img src={logo} alt="Campometric" className="h-10" />
           </Link>
           <div className="flex items-center gap-3">
             <span className="text-sm text-muted-foreground hidden sm:block">
