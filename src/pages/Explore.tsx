@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { Search, ChevronDown, Trophy, Zap, MapPin, Timer } from "lucide-react";
+import { Search, ChevronDown, Trophy, Zap, MapPin, Timer, FileCheck } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -35,6 +35,21 @@ interface PlayerCard {
   total_sessions_count: number;
 }
 
+const countryFlag = (country: string) => {
+  const flags: Record<string, string> = {
+    "Romania": "🇷🇴", "Moldova": "🇲🇩", "Germany": "🇩🇪", "France": "🇫🇷",
+    "Spain": "🇪🇸", "Italy": "🇮🇹", "England": "🇬🇧", "UK": "🇬🇧",
+    "Portugal": "🇵🇹", "Netherlands": "🇳🇱", "Brazil": "🇧🇷", "Argentina": "🇦🇷",
+    "Belgium": "🇧🇪", "Croatia": "🇭🇷", "Serbia": "🇷🇸", "Turkey": "🇹🇷",
+    "Poland": "🇵🇱", "Czech Republic": "🇨🇿", "Austria": "🇦🇹", "Switzerland": "🇨🇭",
+    "USA": "🇺🇸", "Mexico": "🇲🇽", "Japan": "🇯🇵", "South Korea": "🇰🇷",
+    "Australia": "🇦🇺", "Greece": "🇬🇷", "Denmark": "🇩🇰", "Sweden": "🇸🇪",
+    "Norway": "🇳🇴", "Finland": "🇫🇮", "Ukraine": "🇺🇦", "Hungary": "🇭🇺",
+    "Bulgaria": "🇧🇬", "Scotland": "🏴󠁧󠁢󠁳󠁣󠁴󠁿", "Wales": "🏴󠁧󠁢󠁷󠁬󠁳󠁿", "Ireland": "🇮🇪",
+  };
+  return flags[country] || "🌍";
+};
+
 const Explore = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -44,7 +59,7 @@ const Explore = () => {
   const [players, setPlayers] = useState<PlayerCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [leaderboardTab, setLeaderboardTab] = useState<SortKey>("cpi");
-  const [pdfOnlyFilter, setPdfOnlyFilter] = useState(false);
+  const [pdfOnlyFilter, setPdfOnlyFilter] = useState(true); // Default to PDF Verified
 
   useEffect(() => {
     const fetchPlayers = async () => {
@@ -98,6 +113,7 @@ const Explore = () => {
 
   const filtered = players
     .filter((p) => {
+      if (pdfOnlyFilter && p.pdf_session_count === 0) return false;
       if (posFilter && p.position !== posFilter && p.position_specific !== posFilter) return false;
       if (query) {
         const q = query.toLowerCase();
@@ -114,12 +130,13 @@ const Explore = () => {
       return (b[map[sortBy]] as number) - (a[map[sortBy]] as number);
     });
 
+  // Leaderboard always uses PDF-verified players only
   const leaderboard = [...players]
-    .filter(p => !pdfOnlyFilter || (p.total_sessions_count > 0 && p.pdf_session_count / p.total_sessions_count > 0.5))
+    .filter(p => p.pdf_session_count > 0)
     .sort((a, b) => {
-    const map: Record<SortKey, keyof PlayerCard> = { cpi: "cpi", top_speed: "top_speed", distance: "distance_per90", sprint: "sprint_per90" };
-    return (b[map[leaderboardTab]] as number) - (a[map[leaderboardTab]] as number);
-  });
+      const map: Record<SortKey, keyof PlayerCard> = { cpi: "cpi", top_speed: "top_speed", distance: "distance_per90", sprint: "sprint_per90" };
+      return (b[map[leaderboardTab]] as number) - (a[map[leaderboardTab]] as number);
+    });
 
   const getStatDisplay = (p: PlayerCard, key: SortKey) => {
     switch (key) {
@@ -175,8 +192,8 @@ const Explore = () => {
           ))}
         </div>
 
-        {/* Sort */}
-        <div className="flex items-center gap-2 mb-8">
+        {/* Sort + PDF filter */}
+        <div className="flex items-center gap-2 mb-4">
           <span className="text-xs text-muted-foreground">Sort by:</span>
           {SORT_OPTIONS.map((opt) => (
             <button
@@ -190,6 +207,21 @@ const Explore = () => {
               {opt.label}
             </button>
           ))}
+        </div>
+
+        <div className="flex items-center gap-2 mb-8">
+          <button
+            onClick={() => setPdfOnlyFilter(true)}
+            className={cn("px-3 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5", pdfOnlyFilter ? "bg-[#1D9E75]/20 text-[#1D9E75]" : "text-muted-foreground hover:text-foreground")}
+          >
+            <FileCheck className="h-3.5 w-3.5" /> PDF Verified
+          </button>
+          <button
+            onClick={() => setPdfOnlyFilter(false)}
+            className={cn("px-3 py-1.5 rounded-md text-xs font-medium transition-colors", !pdfOnlyFilter ? "bg-secondary text-foreground" : "text-muted-foreground hover:text-foreground")}
+          >
+            Show all players
+          </button>
         </div>
 
         {/* Results */}
@@ -215,7 +247,10 @@ const Explore = () => {
               >
                 <div className="flex items-start justify-between mb-3">
                   <div>
-                    <p className="font-semibold text-foreground">{p.full_name}</p>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-sm">{countryFlag(p.country)}</span>
+                      <p className="font-semibold text-foreground">{p.full_name}</p>
+                    </div>
                     <p className="text-xs text-muted-foreground">{p.current_club} · {p.country}</p>
                   </div>
                   <span className={cn("text-2xl font-bold", cpiColor(p.cpi))}>{Math.round(p.cpi) || "—"}</span>
@@ -227,6 +262,11 @@ const Explore = () => {
                   <span className="text-xs text-muted-foreground">
                     {p.top_speed > 0 ? `${p.top_speed.toFixed(1)} km/h` : "—"}
                   </span>
+                  {p.pdf_session_count > 0 && (
+                    <span className="text-[9px] font-medium text-[#1D9E75] bg-[#1D9E75]/10 px-1.5 py-0.5 rounded">
+                      PDF ✓
+                    </span>
+                  )}
                 </div>
                 {p.trust_score > 0 && <TrustStars score={p.trust_score} size="sm" />}
               </button>
@@ -237,7 +277,13 @@ const Explore = () => {
         {/* Leaderboard tabs */}
         {players.length > 0 && (
           <div>
-            <h2 className="text-xl font-bold text-foreground mb-4">Leaderboard</h2>
+            <div className="flex items-center gap-3 mb-2">
+              <h2 className="text-xl font-bold text-foreground">Leaderboard</h2>
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <FileCheck className="h-3.5 w-3.5 text-[#1D9E75]" />
+                PDF-verified data only
+              </div>
+            </div>
             <div className="flex items-center gap-4 mb-4">
               <div className="flex gap-2">
                 {SORT_OPTIONS.map((opt) => (
@@ -253,43 +299,51 @@ const Explore = () => {
                   </button>
                 ))}
               </div>
-              <div className="flex gap-2 ml-auto">
-                <button
-                  onClick={() => setPdfOnlyFilter(false)}
-                  className={cn("px-3 py-1.5 rounded-md text-xs font-medium transition-colors", !pdfOnlyFilter ? "bg-secondary text-foreground" : "text-muted-foreground hover:text-foreground")}
-                >
-                  All players
-                </button>
-                <button
-                  onClick={() => setPdfOnlyFilter(true)}
-                  className={cn("px-3 py-1.5 rounded-md text-xs font-medium transition-colors", pdfOnlyFilter ? "bg-[#1D9E75]/20 text-[#1D9E75]" : "text-muted-foreground hover:text-foreground")}
-                >
-                  PDF Verified only
-                </button>
-              </div>
             </div>
             <div className="rounded-xl border border-border bg-card divide-y divide-border">
-              {leaderboard.map((p, i) => (
-                <button
-                  key={p.id}
-                  onClick={() => p.username && navigate(`/player/${p.username}`)}
-                  className="w-full text-left px-5 py-3.5 flex items-center gap-4 hover:bg-secondary/50 transition-colors"
-                >
-                  <span className="text-sm font-bold text-muted-foreground w-8 text-right">#{i + 1}</span>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-medium text-foreground truncate">{p.full_name}</p>
-                      {p.trust_score > 0 && <TrustStars score={p.trust_score} size="sm" />}
+              {leaderboard.length === 0 ? (
+                <div className="p-8 text-center">
+                  <p className="text-sm text-muted-foreground">No PDF-verified players yet. Be the first!</p>
+                  <Button
+                    size="sm"
+                    className="mt-3 bg-[#1D9E75] hover:bg-[#178a64] text-white"
+                    onClick={() => navigate("/analyze")}
+                  >
+                    Upload GPS PDF →
+                  </Button>
+                </div>
+              ) : (
+                leaderboard.map((p, i) => (
+                  <button
+                    key={p.id}
+                    onClick={() => p.username && navigate(`/player/${p.username}`)}
+                    className="w-full text-left px-5 py-3.5 flex items-center gap-4 hover:bg-secondary/50 transition-colors"
+                  >
+                    <span className="text-sm font-bold text-muted-foreground w-8 text-right">#{i + 1}</span>
+                    <span className="text-sm shrink-0">{countryFlag(p.country)}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium text-foreground truncate">{p.full_name}</p>
+                        <span className="px-1.5 py-0.5 rounded bg-secondary text-[10px] font-semibold text-foreground shrink-0">
+                          {p.position_specific || p.position}
+                        </span>
+                        {p.trust_score > 0 && <TrustStars score={p.trust_score} size="sm" />}
+                      </div>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {p.current_club} · {p.country}
+                      </p>
                     </div>
-                    <p className="text-xs text-muted-foreground truncate">
-                      {p.position_specific || p.position} · {p.current_club} · {p.country}
-                    </p>
-                  </div>
-                  <span className="text-sm font-bold text-[#1D9E75] shrink-0">
-                    {getStatDisplay(p, leaderboardTab)}
-                  </span>
-                </button>
-              ))}
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className="text-sm font-bold text-[#1D9E75]">
+                        {getStatDisplay(p, leaderboardTab)}
+                      </span>
+                      <span className="text-[9px] font-medium text-[#1D9E75] bg-[#1D9E75]/10 px-1 py-0.5 rounded">
+                        PDF ✓
+                      </span>
+                    </div>
+                  </button>
+                ))
+              )}
             </div>
           </div>
         )}
