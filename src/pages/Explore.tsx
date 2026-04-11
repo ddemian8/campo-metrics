@@ -238,7 +238,8 @@ const Explore = () => {
         {players.length > 0 && (
           <div>
             <h2 className="text-xl font-bold text-foreground mb-4">Leaderboard</h2>
-            <div className="flex gap-2 mb-4">
+            <div className="flex items-center gap-4 mb-4">
+              <div className="flex gap-2">
               {SORT_OPTIONS.map((opt) => (
                 <button
                   key={opt.value}
