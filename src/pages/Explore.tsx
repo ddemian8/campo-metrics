@@ -114,7 +114,9 @@ const Explore = () => {
       return (b[map[sortBy]] as number) - (a[map[sortBy]] as number);
     });
 
-  const leaderboard = [...players].sort((a, b) => {
+  const leaderboard = [...players]
+    .filter(p => !pdfOnlyFilter || (p.total_sessions_count > 0 && p.pdf_session_count / p.total_sessions_count > 0.5))
+    .sort((a, b) => {
     const map: Record<SortKey, keyof PlayerCard> = { cpi: "cpi", top_speed: "top_speed", distance: "distance_per90", sprint: "sprint_per90" };
     return (b[map[leaderboardTab]] as number) - (a[map[leaderboardTab]] as number);
   });
@@ -226,6 +228,7 @@ const Explore = () => {
                     {p.top_speed > 0 ? `${p.top_speed.toFixed(1)} km/h` : "—"}
                   </span>
                 </div>
+                {p.trust_score > 0 && <TrustStars score={p.trust_score} size="sm" />}
               </button>
             ))}
           </div>
