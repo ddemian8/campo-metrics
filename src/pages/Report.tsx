@@ -11,7 +11,6 @@ import {
   ChevronRight,
   ArrowLeft,
   Crown,
-  Lock,
   Copy,
   AlertTriangle,
 } from "lucide-react";
