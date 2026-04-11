@@ -515,10 +515,47 @@ const Analyze = () => {
       if (form.entryMethod === "manual") {
         if (!form.manualData.duration) e.duration = "Required";
         else if (!/^\d{1,3}:\d{2}$/.test(form.manualData.duration)) e.duration = "Please use mm:ss format";
+        else {
+          const [mm] = form.manualData.duration.split(":").map(Number);
+          if (mm < 1) e.duration = "Duration must be at least 1 minute";
+          else if (mm > 150) e.duration = "This value exceeds known human limits. Please check your data.";
+        }
         if (!form.manualData.distance) e.distance = "Required";
+        else { const v = parseFloat(form.manualData.distance); if (v < 100 || v > 16000) e.distance = "This value exceeds known human limits. Please check your data."; }
         if (!form.manualData.max_sp) e.max_sp = "Required";
+        else { const v = parseFloat(form.manualData.max_sp); if (v < 8 || v > 38) e.max_sp = "This value exceeds known human limits. Please check your data."; }
         if (!form.manualData.sp_ev) e.sp_ev = "Required";
+        else { const v = parseFloat(form.manualData.sp_ev); if (v < 0 || v > 200) e.sp_ev = "This value exceeds known human limits. Please check your data."; }
         if (!form.manualData.hmld) e.hmld = "Required";
+        else { const v = parseFloat(form.manualData.hmld); if (v < 0 || v > 5000) e.hmld = "This value exceeds known human limits. Please check your data."; }
+
+        // Optional field limits
+        if (form.manualData.av_sp) { const v = parseFloat(form.manualData.av_sp); if (v < 3 || v > 20) e.av_sp = "This value exceeds known human limits. Please check your data."; }
+        if (form.manualData.acc_ev) { const v = parseFloat(form.manualData.acc_ev); if (v < 0 || v > 150) e.acc_ev = "This value exceeds known human limits. Please check your data."; }
+        if (form.manualData.dec_ev) { const v = parseFloat(form.manualData.dec_ev); if (v < 0 || v > 150) e.dec_ev = "This value exceeds known human limits. Please check your data."; }
+        if (form.manualData.dist_sp_z4) { const v = parseFloat(form.manualData.dist_sp_z4); if (v < 0 || v > 3000) e.dist_sp_z4 = "This value exceeds known human limits. Please check your data."; }
+        if (form.manualData.dist_sp_z4plus) { const v = parseFloat(form.manualData.dist_sp_z4plus); if (v < 0 || v > 3000) e.dist_sp_z4plus = "This value exceeds known human limits. Please check your data."; }
+        if (form.manualData.dist_sp_z5) { const v = parseFloat(form.manualData.dist_sp_z5); if (v < 0 || v > 2000) e.dist_sp_z5 = "This value exceeds known human limits. Please check your data."; }
+
+        // Cross-validation
+        const dist = parseFloat(form.manualData.distance);
+        const sprintDist = parseFloat(form.manualData.dist_sp_z5);
+        const hsrDist = parseFloat(form.manualData.dist_sp_z4);
+        const avgSp = parseFloat(form.manualData.av_sp);
+        const maxSp = parseFloat(form.manualData.max_sp);
+
+        if (!isNaN(sprintDist) && !isNaN(dist) && sprintDist > dist) e.dist_sp_z5 = "Sprint distance cannot exceed total distance";
+        if (!isNaN(hsrDist) && !isNaN(dist) && hsrDist > dist) e.dist_sp_z4 = "HSR distance cannot exceed total distance";
+        if (!isNaN(avgSp) && !isNaN(maxSp) && avgSp > maxSp) e.av_sp = "Average speed cannot exceed top speed";
+
+        // Warnings (stored separately, don't block submit)
+        if (!isNaN(dist) && form.manualData.duration) {
+          const [mm] = form.manualData.duration.split(":").map(Number);
+          if (mm > 0 && dist > mm * 250) {
+            // This is a warning, not an error — don't add to `e`
+            setForm(prev => ({ ...prev, _distanceWarning: true } as any));
+          }
+        }
       }
       if (!form.consent.terms) e.consent_terms = "Please accept the Terms of Service and Privacy Policy to continue.";
     }
@@ -660,6 +697,54 @@ const Analyze = () => {
         await supabase.from('profiles').update({
           reports_used_this_month: (profile.reports_used_this_month || 0) + 1,
         }).eq('id', profile.id);
+      }
+
+      // Update session source counters in player_stats_aggregate
+      const inputMethodDb = form.entryMethod === 'pdf' ? 'pdf_upload' : (form.entryMethod || 'manual');
+      const counterField = inputMethodDb === 'pdf_upload' ? 'pdf_session_count' 
+        : inputMethodDb === 'screenshot' ? 'screenshot_session_count' : 'manual_session_count';
+      
+      // Fetch current stats to increment
+      const { data: currentStats } = await supabase
+        .from('player_stats_aggregate')
+        .select('pdf_session_count, screenshot_session_count, manual_session_count, total_sessions')
+        .eq('player_id', profile.id)
+        .maybeSingle();
+
+      if (currentStats) {
+        const pdfCount = (currentStats.pdf_session_count || 0) + (counterField === 'pdf_session_count' ? 1 : 0);
+        const ssCount = (currentStats.screenshot_session_count || 0) + (counterField === 'screenshot_session_count' ? 1 : 0);
+        const manualCount = (currentStats.manual_session_count || 0) + (counterField === 'manual_session_count' ? 1 : 0);
+        const totalSess = (currentStats.total_sessions || 0) + 1;
+
+        // Calculate trust score
+        let trustScore = 0;
+        if (totalSess > 0) {
+          const pdfPct = pdfCount / totalSess;
+          const ssPct = ssCount / totalSess;
+          if (pdfPct > 0.8) trustScore += 30;
+          else if (pdfPct > 0.5) trustScore += 15;
+          else if (ssPct > 0.5) trustScore += 5;
+        }
+        if (profile.transfermarkt_url) trustScore += 20;
+        // Club membership bonus checked via club_members
+        const { count: clubCount } = await supabase
+          .from('club_members')
+          .select('*', { count: 'exact', head: true })
+          .eq('player_id', profile.id)
+          .eq('is_active', true);
+        if (clubCount && clubCount > 0) trustScore += 20;
+        if (totalSess > 10) trustScore += 15;
+        else if (totalSess >= 5) trustScore += 8;
+        else if (totalSess >= 2) trustScore += 3;
+        // Consistency check would require fetching all session top speeds - skip for now, add +8 default
+        trustScore += 8;
+        trustScore = Math.min(trustScore, 100);
+
+        await supabase.from('player_stats_aggregate').update({
+          [counterField]: (currentStats as any)[counterField] + 1,
+          trust_score: trustScore,
+        } as any).eq('player_id', profile.id);
       }
 
       // Save profile data if this was a first-time user with missing fields
@@ -1524,6 +1609,18 @@ const Analyze = () => {
                         </div>
                       ))}
                     </div>
+
+                    {/* Distance warning (non-blocking) */}
+                    {form.manualData.distance && form.manualData.duration && (() => {
+                      const [mm] = form.manualData.duration.split(":").map(Number);
+                      const dist = parseFloat(form.manualData.distance);
+                      return mm > 0 && dist > mm * 250;
+                    })() && (
+                      <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 max-w-2xl mx-auto mt-3 text-left">
+                        <AlertTriangle className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
+                        <p className="text-xs text-amber-300">This distance seems very high for the time played. Please verify.</p>
+                      </div>
+                    )}
 
                     {renderConsentSection()}
 

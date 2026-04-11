@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import Navbar from "@/components/Navbar";
+import { TrustStars } from "@/components/TrustStars";
 
 const ALL_POSITIONS = ["GK", "CB", "RB", "LB", "RWB", "LWB", "CDM", "CM", "CAM", "RM", "LM", "ST", "SS", "RW", "LW", "CF"];
 const SORT_OPTIONS = [
@@ -29,6 +30,9 @@ interface PlayerCard {
   top_speed: number;
   distance_per90: number;
   sprint_per90: number;
+  trust_score: number;
+  pdf_session_count: number;
+  total_sessions_count: number;
 }
 
 const Explore = () => {
@@ -40,6 +44,7 @@ const Explore = () => {
   const [players, setPlayers] = useState<PlayerCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [leaderboardTab, setLeaderboardTab] = useState<SortKey>("cpi");
+  const [pdfOnlyFilter, setPdfOnlyFilter] = useState(false);
 
   useEffect(() => {
     const fetchPlayers = async () => {
@@ -59,7 +64,7 @@ const Explore = () => {
       const ids = profiles.map((p) => p.id);
       const { data: stats } = await supabase
         .from("player_stats_aggregate")
-        .select("player_id, avg_performance_score, best_top_speed, avg_distance_per90, avg_sprint_distance_per90")
+        .select("player_id, avg_performance_score, best_top_speed, avg_distance_per90, avg_sprint_distance_per90, trust_score, pdf_session_count, total_sessions")
         .in("player_id", ids);
 
       const statsMap = new Map(stats?.map((s) => [s.player_id, s]) || []);
@@ -78,6 +83,9 @@ const Explore = () => {
           top_speed: Number(s?.best_top_speed) || 0,
           distance_per90: Number(s?.avg_distance_per90) || 0,
           sprint_per90: Number(s?.avg_sprint_distance_per90) || 0,
+          trust_score: Number(s?.trust_score) || 0,
+          pdf_session_count: Number(s?.pdf_session_count) || 0,
+          total_sessions_count: Number(s?.total_sessions) || 0,
         };
       });
 
@@ -106,7 +114,9 @@ const Explore = () => {
       return (b[map[sortBy]] as number) - (a[map[sortBy]] as number);
     });
 
-  const leaderboard = [...players].sort((a, b) => {
+  const leaderboard = [...players]
+    .filter(p => !pdfOnlyFilter || (p.total_sessions_count > 0 && p.pdf_session_count / p.total_sessions_count > 0.5))
+    .sort((a, b) => {
     const map: Record<SortKey, keyof PlayerCard> = { cpi: "cpi", top_speed: "top_speed", distance: "distance_per90", sprint: "sprint_per90" };
     return (b[map[leaderboardTab]] as number) - (a[map[leaderboardTab]] as number);
   });
@@ -218,6 +228,7 @@ const Explore = () => {
                     {p.top_speed > 0 ? `${p.top_speed.toFixed(1)} km/h` : "—"}
                   </span>
                 </div>
+                {p.trust_score > 0 && <TrustStars score={p.trust_score} size="sm" />}
               </button>
             ))}
           </div>
@@ -227,19 +238,35 @@ const Explore = () => {
         {players.length > 0 && (
           <div>
             <h2 className="text-xl font-bold text-foreground mb-4">Leaderboard</h2>
-            <div className="flex gap-2 mb-4">
-              {SORT_OPTIONS.map((opt) => (
+            <div className="flex items-center gap-4 mb-4">
+              <div className="flex gap-2">
+                {SORT_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    onClick={() => setLeaderboardTab(opt.value)}
+                    className={cn(
+                      "px-4 py-2 rounded-lg text-sm font-medium transition-colors",
+                      leaderboardTab === opt.value ? "bg-[#1D9E75] text-white" : "bg-card text-muted-foreground border border-border hover:text-foreground"
+                    )}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+              <div className="flex gap-2 ml-auto">
                 <button
-                  key={opt.value}
-                  onClick={() => setLeaderboardTab(opt.value)}
-                  className={cn(
-                    "px-4 py-2 rounded-lg text-sm font-medium transition-colors",
-                    leaderboardTab === opt.value ? "bg-[#1D9E75] text-white" : "bg-card text-muted-foreground border border-border hover:text-foreground"
-                  )}
+                  onClick={() => setPdfOnlyFilter(false)}
+                  className={cn("px-3 py-1.5 rounded-md text-xs font-medium transition-colors", !pdfOnlyFilter ? "bg-secondary text-foreground" : "text-muted-foreground hover:text-foreground")}
                 >
-                  {opt.label}
+                  All players
                 </button>
-              ))}
+                <button
+                  onClick={() => setPdfOnlyFilter(true)}
+                  className={cn("px-3 py-1.5 rounded-md text-xs font-medium transition-colors", pdfOnlyFilter ? "bg-[#1D9E75]/20 text-[#1D9E75]" : "text-muted-foreground hover:text-foreground")}
+                >
+                  PDF Verified only
+                </button>
+              </div>
             </div>
             <div className="rounded-xl border border-border bg-card divide-y divide-border">
               {leaderboard.map((p, i) => (
@@ -250,7 +277,10 @@ const Explore = () => {
                 >
                   <span className="text-sm font-bold text-muted-foreground w-8 text-right">#{i + 1}</span>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">{p.full_name}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium text-foreground truncate">{p.full_name}</p>
+                      {p.trust_score > 0 && <TrustStars score={p.trust_score} size="sm" />}
+                    </div>
                     <p className="text-xs text-muted-foreground truncate">
                       {p.position_specific || p.position} · {p.current_club} · {p.country}
                     </p>

@@ -13,8 +13,10 @@ import {
   Crown,
   Lock,
   Copy,
+  AlertTriangle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { DataSourceBadge } from "@/components/DataSourceBadge";
 
 interface KeyMetric {
   label: string;
@@ -34,6 +36,7 @@ interface ReportData {
   areaToImprove: { title: string; explanation: string };
   positionalContext: string;
   motivationalClose: string;
+  dataFlags?: string[];
 }
 
 interface GpsData {
@@ -116,6 +119,7 @@ const Report = () => {
             opponent: sess?.opponent,
             gps_data: gps,
             player_id: reportRow.player_id,
+            input_method: sess?.input_method || null,
           });
           setIsPublic(reportRow.is_public);
 
@@ -362,8 +366,11 @@ const Report = () => {
                 )}
               </div>
             </div>
-            <div className="text-[12px] text-muted-foreground bg-secondary rounded-lg px-3 py-2 shrink-0">
-              {sessionInfo}
+            <div className="flex items-center gap-3">
+              <div className="text-[12px] text-muted-foreground bg-secondary rounded-lg px-3 py-2 shrink-0">
+                {sessionInfo}
+              </div>
+              <DataSourceBadge inputMethod={session.input_method} size="md" />
             </div>
           </div>
         </div>
@@ -389,6 +396,18 @@ const Report = () => {
               <h3 className="text-sm font-semibold text-foreground mb-3">Executive Summary</h3>
               <p className="text-sm text-muted-foreground leading-[1.8]">{report.executiveSummary}</p>
             </div>
+
+            {/* Data Flags */}
+            {report.dataFlags && report.dataFlags.length > 0 && (
+              <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 space-y-2">
+                {report.dataFlags.map((flag, i) => (
+                  <div key={i} className="flex items-start gap-2">
+                    <AlertTriangle className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
+                    <p className="text-sm text-amber-300">{flag}</p>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {/* Key Metrics */}
             <div className="rounded-2xl border border-border/50 bg-card p-6">

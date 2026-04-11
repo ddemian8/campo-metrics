@@ -12,6 +12,8 @@ import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Dot,
 } from "recharts";
 import Navbar from "@/components/Navbar";
+import { DataSourceBadge } from "@/components/DataSourceBadge";
+import { TrustStars } from "@/components/TrustStars";
 
 interface ProfileData {
   id: string;
@@ -43,6 +45,7 @@ interface StatsData {
   total_sessions: number;
   total_matches: number;
   total_trainings: number;
+  trust_score: number;
 }
 
 interface ReportRow {
@@ -55,6 +58,7 @@ interface ReportRow {
     session_date: string;
     opponent: string | null;
     training_day: string | null;
+    input_method: string | null;
   } | null;
 }
 
@@ -110,7 +114,7 @@ const PlayerProfile = () => {
         supabase.from("player_stats_aggregate").select("*").eq("player_id", p.id).maybeSingle(),
         supabase
           .from("reports")
-          .select("id, session_id, ai_report, created_at, sessions(session_type, session_date, opponent, training_day)")
+          .select("id, session_id, ai_report, created_at, sessions(session_type, session_date, opponent, training_day, input_method)")
           .eq("player_id", p.id)
           .eq("is_public", true)
           .order("created_at", { ascending: false })
@@ -270,6 +274,9 @@ const PlayerProfile = () => {
                       {profile.position_specific}
                     </span>
                   )}
+                  {stats?.trust_score != null && stats.trust_score > 0 && (
+                    <TrustStars score={stats.trust_score} showLabel size="md" />
+                  )}
                 </div>
                 <p className="text-sm text-muted-foreground mt-1.5">
                   {[profile.current_club, profile.current_league, profile.country].filter(Boolean).join(" · ")}
@@ -376,7 +383,10 @@ const PlayerProfile = () => {
                       ) : <span className="text-muted-foreground">—</span>}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-foreground truncate">{ctx}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium text-foreground truncate">{ctx}</p>
+                        <DataSourceBadge inputMethod={(r.sessions as any)?.input_method} />
+                      </div>
                       <p className="text-xs text-muted-foreground">{dateStr}</p>
                     </div>
                     <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />

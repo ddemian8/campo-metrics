@@ -232,10 +232,14 @@ export type Database = {
           best_sprint_distance_single: number | null
           best_top_speed: number | null
           last_session_date: string | null
+          manual_session_count: number
+          pdf_session_count: number
           player_id: string
+          screenshot_session_count: number
           total_matches: number
           total_sessions: number
           total_trainings: number
+          trust_score: number
           updated_at: string
         }
         Insert: {
@@ -252,10 +256,14 @@ export type Database = {
           best_sprint_distance_single?: number | null
           best_top_speed?: number | null
           last_session_date?: string | null
+          manual_session_count?: number
+          pdf_session_count?: number
           player_id: string
+          screenshot_session_count?: number
           total_matches?: number
           total_sessions?: number
           total_trainings?: number
+          trust_score?: number
           updated_at?: string
         }
         Update: {
@@ -272,10 +280,14 @@ export type Database = {
           best_sprint_distance_single?: number | null
           best_top_speed?: number | null
           last_session_date?: string | null
+          manual_session_count?: number
+          pdf_session_count?: number
           player_id?: string
+          screenshot_session_count?: number
           total_matches?: number
           total_sessions?: number
           total_trainings?: number
+          trust_score?: number
           updated_at?: string
         }
         Relationships: [
