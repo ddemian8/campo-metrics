@@ -515,10 +515,47 @@ const Analyze = () => {
       if (form.entryMethod === "manual") {
         if (!form.manualData.duration) e.duration = "Required";
         else if (!/^\d{1,3}:\d{2}$/.test(form.manualData.duration)) e.duration = "Please use mm:ss format";
+        else {
+          const [mm] = form.manualData.duration.split(":").map(Number);
+          if (mm < 1) e.duration = "Duration must be at least 1 minute";
+          else if (mm > 150) e.duration = "This value exceeds known human limits. Please check your data.";
+        }
         if (!form.manualData.distance) e.distance = "Required";
+        else { const v = parseFloat(form.manualData.distance); if (v < 100 || v > 16000) e.distance = "This value exceeds known human limits. Please check your data."; }
         if (!form.manualData.max_sp) e.max_sp = "Required";
+        else { const v = parseFloat(form.manualData.max_sp); if (v < 8 || v > 38) e.max_sp = "This value exceeds known human limits. Please check your data."; }
         if (!form.manualData.sp_ev) e.sp_ev = "Required";
+        else { const v = parseFloat(form.manualData.sp_ev); if (v < 0 || v > 200) e.sp_ev = "This value exceeds known human limits. Please check your data."; }
         if (!form.manualData.hmld) e.hmld = "Required";
+        else { const v = parseFloat(form.manualData.hmld); if (v < 0 || v > 5000) e.hmld = "This value exceeds known human limits. Please check your data."; }
+
+        // Optional field limits
+        if (form.manualData.av_sp) { const v = parseFloat(form.manualData.av_sp); if (v < 3 || v > 20) e.av_sp = "This value exceeds known human limits. Please check your data."; }
+        if (form.manualData.acc_ev) { const v = parseFloat(form.manualData.acc_ev); if (v < 0 || v > 150) e.acc_ev = "This value exceeds known human limits. Please check your data."; }
+        if (form.manualData.dec_ev) { const v = parseFloat(form.manualData.dec_ev); if (v < 0 || v > 150) e.dec_ev = "This value exceeds known human limits. Please check your data."; }
+        if (form.manualData.dist_sp_z4) { const v = parseFloat(form.manualData.dist_sp_z4); if (v < 0 || v > 3000) e.dist_sp_z4 = "This value exceeds known human limits. Please check your data."; }
+        if (form.manualData.dist_sp_z4plus) { const v = parseFloat(form.manualData.dist_sp_z4plus); if (v < 0 || v > 3000) e.dist_sp_z4plus = "This value exceeds known human limits. Please check your data."; }
+        if (form.manualData.dist_sp_z5) { const v = parseFloat(form.manualData.dist_sp_z5); if (v < 0 || v > 2000) e.dist_sp_z5 = "This value exceeds known human limits. Please check your data."; }
+
+        // Cross-validation
+        const dist = parseFloat(form.manualData.distance);
+        const sprintDist = parseFloat(form.manualData.dist_sp_z5);
+        const hsrDist = parseFloat(form.manualData.dist_sp_z4);
+        const avgSp = parseFloat(form.manualData.av_sp);
+        const maxSp = parseFloat(form.manualData.max_sp);
+
+        if (!isNaN(sprintDist) && !isNaN(dist) && sprintDist > dist) e.dist_sp_z5 = "Sprint distance cannot exceed total distance";
+        if (!isNaN(hsrDist) && !isNaN(dist) && hsrDist > dist) e.dist_sp_z4 = "HSR distance cannot exceed total distance";
+        if (!isNaN(avgSp) && !isNaN(maxSp) && avgSp > maxSp) e.av_sp = "Average speed cannot exceed top speed";
+
+        // Warnings (stored separately, don't block submit)
+        if (!isNaN(dist) && form.manualData.duration) {
+          const [mm] = form.manualData.duration.split(":").map(Number);
+          if (mm > 0 && dist > mm * 250) {
+            // This is a warning, not an error — don't add to `e`
+            setForm(prev => ({ ...prev, _distanceWarning: true } as any));
+          }
+        }
       }
       if (!form.consent.terms) e.consent_terms = "Please accept the Terms of Service and Privacy Policy to continue.";
     }
