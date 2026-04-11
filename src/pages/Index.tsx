@@ -18,6 +18,7 @@ const Index = () => (
     <HowItWorks />
     <ReportPreview />
     <Flywheel />
+    <BrowsePlayers />
     <Pricing />
     <Testimonials />
     <AffiliateBanner />
