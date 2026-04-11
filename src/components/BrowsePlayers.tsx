@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { Search, Zap, MapPin, Trophy } from "lucide-react";
+import { Search, Zap, MapPin, Trophy, FileCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import AnimateIn from "@/components/AnimateIn";
@@ -11,7 +11,9 @@ interface LeaderboardEntry {
   value: number;
   full_name: string;
   position: string;
+  position_specific: string | null;
   current_club: string;
+  country: string;
 }
 
 const BrowsePlayers = () => {
@@ -23,9 +25,11 @@ const BrowsePlayers = () => {
 
   useEffect(() => {
     const fetchLeaderboards = async () => {
+      // Only fetch players with PDF sessions
       const { data: statsData } = await supabase
         .from("player_stats_aggregate")
-        .select("player_id, best_top_speed, avg_distance_per90, avg_performance_score")
+        .select("player_id, best_top_speed, avg_distance_per90, avg_performance_score, pdf_session_count")
+        .gt("pdf_session_count", 0)
         .order("best_top_speed", { ascending: false })
         .limit(20);
 
@@ -34,7 +38,7 @@ const BrowsePlayers = () => {
       const playerIds = statsData.map((s) => s.player_id);
       const { data: profiles } = await supabase
         .from("profiles")
-        .select("id, full_name, position, current_club, is_public")
+        .select("id, full_name, position, position_specific, current_club, country, is_public")
         .in("id", playerIds)
         .eq("is_public", true);
 
@@ -57,7 +61,9 @@ const BrowsePlayers = () => {
               value: Number(s[key]) || 0,
               full_name: p.full_name || "Unknown",
               position: p.position || "—",
+              position_specific: p.position_specific || null,
               current_club: p.current_club || "—",
+              country: p.country || "—",
             };
           });
 
@@ -75,6 +81,22 @@ const BrowsePlayers = () => {
   };
 
   const placeholderRows = Array.from({ length: 5 }, (_, i) => i);
+  const hasPlayers = fastest.length > 0 || mostDistance.length > 0 || highestCpi.length > 0;
+
+  const countryFlag = (country: string) => {
+    const flags: Record<string, string> = {
+      "Romania": "🇷🇴", "Moldova": "🇲🇩", "Germany": "🇩🇪", "France": "🇫🇷",
+      "Spain": "🇪🇸", "Italy": "🇮🇹", "England": "🇬🇧", "UK": "🇬🇧",
+      "Portugal": "🇵🇹", "Netherlands": "🇳🇱", "Brazil": "🇧🇷", "Argentina": "🇦🇷",
+      "Belgium": "🇧🇪", "Croatia": "🇭🇷", "Serbia": "🇷🇸", "Turkey": "🇹🇷",
+      "Poland": "🇵🇱", "Czech Republic": "🇨🇿", "Austria": "🇦🇹", "Switzerland": "🇨🇭",
+      "USA": "🇺🇸", "Mexico": "🇲🇽", "Japan": "🇯🇵", "South Korea": "🇰🇷",
+      "Australia": "🇦🇺", "Greece": "🇬🇷", "Denmark": "🇩🇰", "Sweden": "🇸🇪",
+      "Norway": "🇳🇴", "Finland": "🇫🇮", "Ukraine": "🇺🇦", "Hungary": "🇭🇺",
+      "Bulgaria": "🇧🇬", "Scotland": "🏴󠁧󠁢󠁳󠁣󠁴󠁿", "Wales": "🏴󠁧󠁢󠁷󠁬󠁳󠁿", "Ireland": "🇮🇪",
+    };
+    return flags[country] || "🌍";
+  };
 
   const renderLeaderboard = (
     title: string,
@@ -94,21 +116,32 @@ const BrowsePlayers = () => {
                 <span className="text-xs font-bold text-muted-foreground w-5 text-right">
                   {i + 1}
                 </span>
+                <span className="text-sm shrink-0">{countryFlag(entry.country)}</span>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-foreground truncate">
-                    {entry.full_name}
-                  </p>
+                  <div className="flex items-center gap-1.5">
+                    <p className="text-sm font-medium text-foreground truncate">
+                      {entry.full_name}
+                    </p>
+                    <span className="px-1.5 py-0.5 rounded bg-secondary text-[10px] font-semibold text-foreground shrink-0">
+                      {entry.position_specific || entry.position}
+                    </span>
+                  </div>
                   <p className="text-xs text-muted-foreground truncate">
-                    {entry.position} · {entry.current_club}
+                    {entry.current_club}
                   </p>
                 </div>
-                <span className="text-sm font-bold text-[#1D9E75] shrink-0">
-                  {unit === "km/h"
-                    ? `${entry.value.toFixed(1)} ${unit}`
-                    : unit === "m/90"
-                    ? `${Math.round(entry.value).toLocaleString()} ${unit}`
-                    : Math.round(entry.value)}
-                </span>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <span className="text-sm font-bold text-[#1D9E75]">
+                    {unit === "km/h"
+                      ? `${entry.value.toFixed(1)} ${unit}`
+                      : unit === "m/90"
+                      ? `${Math.round(entry.value).toLocaleString()} ${unit}`
+                      : Math.round(entry.value)}
+                  </span>
+                  <span className="text-[9px] font-medium text-[#1D9E75] bg-[#1D9E75]/10 px-1 py-0.5 rounded">
+                    PDF ✓
+                  </span>
+                </div>
               </div>
             ))
           : placeholderRows.map((i) => (
@@ -140,7 +173,7 @@ const BrowsePlayers = () => {
         </AnimateIn>
 
         <AnimateIn delay={0.1}>
-          <form onSubmit={handleSearch} className="max-w-lg mx-auto mb-12">
+          <form onSubmit={handleSearch} className="max-w-lg mx-auto mb-8">
             <div className="relative">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
               <Input
@@ -153,13 +186,44 @@ const BrowsePlayers = () => {
           </form>
         </AnimateIn>
 
+        {/* PDF-verified info badge */}
+        <AnimateIn delay={0.15}>
+          <div className="flex items-center justify-center gap-2 mb-6">
+            <FileCheck className="h-4 w-4 text-[#1D9E75]" />
+            <p className="text-xs text-muted-foreground">
+              Leaderboard rankings are based on PDF-verified GPS data only
+            </p>
+          </div>
+        </AnimateIn>
+
         <AnimateIn delay={0.2}>
-          <div className="grid md:grid-cols-3 gap-5 mb-10">
+          <div className="grid md:grid-cols-3 gap-5 mb-6">
             {renderLeaderboard("Fastest players", <Zap className="h-4 w-4 text-[#1D9E75]" />, fastest, "km/h")}
             {renderLeaderboard("Most distance/90", <MapPin className="h-4 w-4 text-[#1D9E75]" />, mostDistance, "m/90")}
             {renderLeaderboard("Highest CPI", <Trophy className="h-4 w-4 text-[#1D9E75]" />, highestCpi, "cpi")}
           </div>
         </AnimateIn>
+
+        {/* CTA if not enough players */}
+        {!hasPlayers && (
+          <AnimateIn delay={0.25}>
+            <div className="rounded-xl border border-dashed border-[#1D9E75]/30 bg-[#1D9E75]/5 p-6 text-center mb-6">
+              <p className="text-sm font-medium text-foreground mb-1">
+                Be the first on the leaderboard
+              </p>
+              <p className="text-xs text-muted-foreground mb-4">
+                Upload your GPS PDF today and get ranked among athletes worldwide.
+              </p>
+              <Button
+                size="sm"
+                className="bg-[#1D9E75] hover:bg-[#178a64] text-white"
+                onClick={() => navigate("/analyze")}
+              >
+                Upload GPS PDF →
+              </Button>
+            </div>
+          </AnimateIn>
+        )}
 
         <AnimateIn delay={0.3} className="text-center">
           <Button

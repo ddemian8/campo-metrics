@@ -375,6 +375,16 @@ const Report = () => {
           </div>
         </div>
 
+        {/* Non-PDF data source info */}
+        {session.input_method && session.input_method !== 'pdf_upload' && (
+          <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 p-4 flex items-start gap-3">
+            <span className="text-lg shrink-0">💡</span>
+            <p className="text-sm text-muted-foreground">
+              This report was generated from {session.input_method === 'screenshot' ? 'a screenshot' : 'manual entry'}. To appear on the Campometric leaderboard, upload your GPS data as a PDF from your tracking platform (STATSports, Catapult, gpexe, etc.)
+            </p>
+          </div>
+        )}
+
         {report ? (
           <>
             {/* CPI Score */}
