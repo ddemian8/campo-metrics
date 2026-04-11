@@ -1610,6 +1610,18 @@ const Analyze = () => {
                       ))}
                     </div>
 
+                    {/* Distance warning (non-blocking) */}
+                    {form.manualData.distance && form.manualData.duration && (() => {
+                      const [mm] = form.manualData.duration.split(":").map(Number);
+                      const dist = parseFloat(form.manualData.distance);
+                      return mm > 0 && dist > mm * 250;
+                    })() && (
+                      <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 max-w-2xl mx-auto mt-3 text-left">
+                        <AlertTriangle className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
+                        <p className="text-xs text-amber-300">This distance seems very high for the time played. Please verify.</p>
+                      </div>
+                    )}
+
                     {renderConsentSection()}
 
                     {(() => {
