@@ -397,6 +397,18 @@ const Report = () => {
               <p className="text-sm text-muted-foreground leading-[1.8]">{report.executiveSummary}</p>
             </div>
 
+            {/* Data Flags */}
+            {report.dataFlags && report.dataFlags.length > 0 && (
+              <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 space-y-2">
+                {report.dataFlags.map((flag, i) => (
+                  <div key={i} className="flex items-start gap-2">
+                    <AlertTriangle className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
+                    <p className="text-sm text-amber-300">{flag}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+
             {/* Key Metrics */}
             <div className="rounded-2xl border border-border/50 bg-card p-6">
               <h3 className="text-sm font-semibold text-foreground mb-4">Key Metrics</h3>
