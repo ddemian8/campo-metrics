@@ -127,10 +127,10 @@ const Report = () => {
           if (reportRow.player_id) {
             const { data: playerProfile } = await supabase
               .from("profiles")
-              .select("username, is_public")
+              .select("username")
               .eq("id", reportRow.player_id)
               .maybeSingle();
-            if (playerProfile?.is_public && playerProfile?.username) {
+            if (playerProfile?.username) {
               setPlayerUsername(playerProfile.username);
             }
           }
@@ -156,8 +156,8 @@ const Report = () => {
             setUserPlan(isPaid ? "pro" : "free");
             setReportsUsed(profileData.reports_used_this_month || 0);
 
-            // Fetch comparison data if public
-            if (isPaid && profileData.position_specific) {
+            // Fetch comparison data for all users
+            if (profileData.position_specific) {
               await fetchComparison(profileData.position_specific, reportRow?.player_id);
             }
           }
@@ -462,43 +462,12 @@ const Report = () => {
               </div>
             </div>
 
-            {/* How You Compare — PRO users see real data, FREE users see blurred */}
+            {/* How You Compare — visible to ALL users */}
             <div className="rounded-2xl border border-border/50 bg-card p-6 relative overflow-hidden">
               <h3 className="text-sm font-semibold text-foreground mb-1">How You Compare</h3>
               <p className="text-xs text-muted-foreground mb-4">Your position among Campometric players</p>
 
-              {userPlan === "free" ? (
-                <>
-                  {/* Blurred preview for free users */}
-                  <div className="grid grid-cols-2 gap-3 blur-md pointer-events-none select-none" aria-hidden>
-                    {["Distance/90", "Top Speed", "Sprint Distance/90", "CPI Score"].map(label => (
-                      <div key={label} className="rounded-lg bg-secondary p-4">
-                        <p className="text-[11px] text-muted-foreground">{label}</p>
-                        <p className="text-lg font-bold text-foreground">10,250 m/90</p>
-                        <p className="text-[10px] text-muted-foreground">Rank: #12 of 45</p>
-                        <div className="mt-2 h-1.5 bg-muted rounded-full overflow-hidden">
-                          <div className="h-full bg-[#1D9E75] rounded-full" style={{ width: "73%" }} />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-card/80 backdrop-blur-sm">
-                    <Lock className="h-6 w-6 text-primary mb-3" />
-                    <p className="text-sm font-medium text-foreground text-center mb-1">
-                      Upgrade to Player Pro to see how you rank
-                    </p>
-                    <p className="text-xs text-muted-foreground text-center mb-4">
-                      Compare your metrics against other players in your position
-                    </p>
-                    <Button
-                      onClick={() => navigate("/#pricing")}
-                      className="bg-[#1D9E75] hover:bg-[#178a64] text-white font-semibold h-10 px-6"
-                    >
-                      Go Pro — €9/month
-                    </Button>
-                  </div>
-                </>
-              ) : comparisonInsufficient ? (
+              {comparisonInsufficient ? (
                 <div className="text-center py-6">
                   <p className="text-sm text-muted-foreground mb-3">
                     Not enough players with your position yet. Invite teammates to see how you compare!
@@ -554,54 +523,29 @@ const Report = () => {
           </div>
         )}
 
-        {/* CTA Section — varies by plan */}
-        {userPlan === "pro" ? (
-          <div className="rounded-2xl border border-border/50 bg-card p-6 space-y-3">
-            <div className="flex flex-col sm:flex-row gap-3">
-              <Button className="flex-1 h-11" onClick={() => window.print()}>
-                <Download className="h-4 w-4 mr-2" /> Download PDF
-              </Button>
-              <Button variant="outline" className="flex-1 h-11">
-                <Share2 className="h-4 w-4 mr-2" /> Share report
-              </Button>
-              <Button variant="ghost" className="flex-1 h-11" onClick={() => navigate("/dashboard")}>
-                <ArrowLeft className="h-4 w-4 mr-2" /> Back to Dashboard
-              </Button>
-            </div>
+        {/* CTA Section */}
+        <div className="rounded-2xl border border-border/50 bg-card p-6 space-y-3">
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Button className="flex-1 h-11" onClick={() => window.print()}>
+              <Download className="h-4 w-4 mr-2" /> Download PDF
+            </Button>
+            <Button variant="outline" className="flex-1 h-11">
+              <Share2 className="h-4 w-4 mr-2" /> Share report
+            </Button>
+            <Button variant="ghost" className="flex-1 h-11" onClick={() => navigate("/dashboard")}>
+              <ArrowLeft className="h-4 w-4 mr-2" /> Back to Dashboard
+            </Button>
+          </div>
+          <p className="text-[11px] text-muted-foreground text-center">
+            ✓ This report is visible on your public profile
+          </p>
+          {userPlan === "free" && (
             <p className="text-[11px] text-muted-foreground text-center">
-              ✓ This report is public and visible to scouts on leaderboards
+              {reportsUsed} of 3 free reports used this month ·{" "}
+              <button onClick={() => navigate("/#pricing")} className="text-primary hover:underline">Upgrade to Pro for unlimited</button>
             </p>
-          </div>
-        ) : (
-          <div className="rounded-2xl border border-border/50 bg-card p-6 space-y-4">
-            <div className="flex flex-col sm:flex-row gap-3">
-              <Button className="flex-1 h-11" onClick={() => window.print()}>
-                <Download className="h-4 w-4 mr-2" /> Download PDF
-              </Button>
-              <Button variant="ghost" className="flex-1 h-11" onClick={() => navigate("/dashboard")}>
-                <ArrowLeft className="h-4 w-4 mr-2" /> Back to Dashboard
-              </Button>
-            </div>
-            <div className="rounded-xl bg-[#0d2a4a] border border-primary/20 p-4 text-center">
-              <Crown className="h-5 w-5 text-primary mx-auto mb-2" />
-              <p className="text-sm text-foreground font-medium mb-1">
-                This report is private
-              </p>
-              <p className="text-xs text-muted-foreground mb-3">
-                Upgrade to Player Pro to make it visible to scouts and appear on leaderboards.
-              </p>
-              <Button
-                onClick={() => navigate("/#pricing")}
-                className="bg-[#1D9E75] hover:bg-[#178a64] text-white font-semibold h-10 px-6"
-              >
-                Go Pro — €9/month →
-              </Button>
-              <p className="text-[11px] text-muted-foreground mt-3">
-                {reportsUsed} of 3 free reports used this month
-              </p>
-            </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );
