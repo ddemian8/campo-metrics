@@ -13,8 +13,10 @@ import {
   Crown,
   Lock,
   Copy,
+  AlertTriangle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { DataSourceBadge } from "@/components/DataSourceBadge";
 
 interface KeyMetric {
   label: string;
@@ -34,6 +36,7 @@ interface ReportData {
   areaToImprove: { title: string; explanation: string };
   positionalContext: string;
   motivationalClose: string;
+  dataFlags?: string[];
 }
 
 interface GpsData {
