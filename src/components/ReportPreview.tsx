@@ -23,9 +23,9 @@ const ReportPreview = () => (
               <p className="text-sm text-muted-foreground">Midfielder · FC Example · Liga 1</p>
               <p className="text-xs text-muted-foreground mt-1">Match · MD0 · vs Opponent FC</p>
             </div>
-            <div className="h-20 w-20 rounded-full bg-success/15 flex flex-col items-center justify-center shrink-0">
-              <span className="text-3xl font-bold text-success">89</span>
-              <span className="text-[10px] text-success/80">Score</span>
+            <div className="h-20 w-20 rounded-full bg-[#1D9E75]/15 flex flex-col items-center justify-center shrink-0">
+              <span className="text-[9px] uppercase tracking-wider text-[#1D9E75]/80">CPI</span>
+              <span className="text-3xl font-bold text-[#1D9E75]">89</span>
             </div>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-6">

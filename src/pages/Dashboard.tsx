@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Loader2, Plus, LogOut, ChevronRight, Crown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -175,14 +174,23 @@ const Dashboard = () => {
               {reports.map((r) => {
                 const report = r.ai_report as any;
                 const sess = r.sessions as any;
-                const score = report?.performanceScore;
-                const headline = report?.headline || "Report";
+                const cpiScore = report?.cpi ?? report?.performanceScore;
                 const sessionType = sess?.session_type;
                 const sessionDate = sess?.session_date;
                 const opponent = sess?.opponent;
                 const trainingDay = sess?.training_day;
 
-                const scoreColor = score >= 75 ? "text-[#1db954]" : score >= 50 ? "text-amber-400" : "text-red-400";
+                const scoreColor = cpiScore >= 75 ? "text-[#1D9E75]" : cpiScore >= 45 ? "text-amber-400" : "text-red-400";
+
+                // Format date: "09 Apr 2026"
+                const formattedDate = sessionDate
+                  ? new Date(sessionDate + "T00:00:00").toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
+                  : null;
+
+                // Context line
+                const contextLine = sessionType === "match"
+                  ? `Match${opponent ? ` vs ${opponent}` : ""}`
+                  : `Training${trainingDay && trainingDay !== "MD0" ? ` ${trainingDay}` : ""}`;
 
                 return (
                   <button
@@ -190,10 +198,13 @@ const Dashboard = () => {
                     onClick={() => navigate(`/report/${r.session_id}`)}
                     className="w-full text-left rounded-lg border border-border bg-card hover:border-primary/50 hover:bg-card/80 p-4 transition-colors flex items-center gap-4"
                   >
-                    {/* Score */}
-                    <div className="shrink-0 w-12 text-center">
-                      {score != null ? (
-                        <span className={cn("text-2xl font-bold", scoreColor)}>{score}</span>
+                    {/* CPI */}
+                    <div className="shrink-0 w-14 text-center">
+                      {cpiScore != null ? (
+                        <div>
+                          <span className="text-[9px] uppercase tracking-wider text-muted-foreground block">CPI</span>
+                          <span className={cn("text-2xl font-bold", scoreColor)}>{cpiScore}</span>
+                        </div>
                       ) : (
                         <span className="text-lg text-muted-foreground">—</span>
                       )}
@@ -201,15 +212,10 @@ const Dashboard = () => {
 
                     {/* Info */}
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-foreground truncate">{headline}</p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <Badge variant="outline" className="text-[10px] h-5">
-                          {sessionType === "match" ? "⚽ Match" : "🏋️ Training"}
-                        </Badge>
-                        {opponent && <span className="text-xs text-muted-foreground">vs {opponent}</span>}
-                        {trainingDay && trainingDay !== "MD0" && <span className="text-xs text-muted-foreground">{trainingDay}</span>}
-                        {sessionDate && <span className="text-xs text-muted-foreground">{sessionDate}</span>}
-                      </div>
+                      <p className="text-sm font-medium text-foreground truncate">{contextLine}</p>
+                      {formattedDate && (
+                        <p className="text-xs text-muted-foreground mt-0.5">{formattedDate}</p>
+                      )}
                     </div>
 
                     {/* Arrow */}

@@ -11,6 +11,8 @@ import {
   ChevronRight,
   ArrowLeft,
   Crown,
+  Lock,
+  Copy,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -25,11 +27,11 @@ interface KeyMetric {
 interface ReportData {
   headline: string;
   executiveSummary: string;
-  performanceScore: number;
+  cpi?: number;
+  performanceScore?: number; // legacy fallback
   keyMetrics: KeyMetric[];
   standoutStrength: { title: string; explanation: string };
   areaToImprove: { title: string; explanation: string };
-  trainingRecommendation: { title: string; drill: string; duration: string; intensity: string };
   positionalContext: string;
   motivationalClose: string;
 }
@@ -45,8 +47,6 @@ interface GpsData {
   league?: string;
   country?: string;
   transfermarkt_url?: string;
-  transfermarkt_club?: string;
-  transfermarkt_league?: string;
   position_zone?: string;
   duration?: string;
   distance?: number;
@@ -59,6 +59,15 @@ interface GpsData {
   dist_sp_z4?: number;
   dist_sp_z4plus?: number;
   dist_sp_z5?: number;
+}
+
+interface ComparisonMetric {
+  label: string;
+  playerValue: string;
+  rank: number;
+  total: number;
+  position: string;
+  percentile: number;
 }
 
 const positionColors: Record<string, string> = {
@@ -77,13 +86,15 @@ const Report = () => {
   const [error, setError] = useState<string | null>(null);
   const [userPlan, setUserPlan] = useState<string>("free");
   const [reportsUsed, setReportsUsed] = useState(0);
+  const [isPublic, setIsPublic] = useState(false);
+  const [comparison, setComparison] = useState<ComparisonMetric[] | null>(null);
+  const [comparisonInsufficient, setComparisonInsufficient] = useState(false);
 
   useEffect(() => {
     if (!id) return;
 
     const fetchReport = async () => {
       try {
-        // Try fetching from reports table via session_id
         const { data: reportRow } = await supabase
           .from("reports")
           .select("*, sessions(*)")
@@ -97,45 +108,22 @@ const Report = () => {
             id: sess?.id,
             player_name: `${gps.first_name || ""} ${gps.last_name || ""}`.trim() || null,
             position: gps.position_zone || sess?.position_specific || null,
+            position_specific: sess?.position_specific || gps.position_zone || null,
             session_type: sess?.session_type,
             training_day: sess?.training_day,
             session_date: sess?.session_date,
             opponent: sess?.opponent,
             gps_data: gps,
+            player_id: reportRow.player_id,
           });
+          setIsPublic(reportRow.is_public);
           if (reportRow.ai_report) {
             setReport(reportRow.ai_report as unknown as ReportData);
           } else {
             setError("Report not yet generated.");
           }
         } else {
-          // Fallback: try anonymous_sessions for legacy reports
-          const { data: anonData } = await supabase
-            .from("anonymous_sessions")
-            .select("*")
-            .eq("id", id)
-            .maybeSingle();
-
-          if (anonData) {
-            const gps = (anonData.gps_data as GpsData) || {};
-            setSession({
-              id: anonData.id,
-              player_name: anonData.player_name,
-              position: anonData.position,
-              session_type: anonData.session_type,
-              training_day: anonData.training_day,
-              session_date: anonData.session_date,
-              opponent: anonData.opponent,
-              gps_data: gps,
-            });
-            if (anonData.ai_report) {
-              setReport(anonData.ai_report as unknown as ReportData);
-            } else {
-              setError("Report not yet generated.");
-            }
-          } else {
-            setError("Report not found");
-          }
+          setError("Report not found");
         }
 
         // Get user plan info
@@ -143,13 +131,18 @@ const Report = () => {
         if (authSession) {
           const { data: profileData } = await supabase
             .from("profiles")
-            .select("subscription_plan, account_type, reports_used_this_month")
+            .select("subscription_plan, account_type, reports_used_this_month, position_specific, id")
             .eq("user_id", authSession.user.id)
             .maybeSingle();
           if (profileData) {
             const isPaid = profileData.subscription_plan !== "free" || profileData.account_type !== "free";
             setUserPlan(isPaid ? "pro" : "free");
             setReportsUsed(profileData.reports_used_this_month || 0);
+
+            // Fetch comparison data if public
+            if (isPaid && profileData.position_specific) {
+              await fetchComparison(profileData.position_specific, reportRow?.player_id);
+            }
           }
         }
       } catch (e) {
@@ -163,16 +156,83 @@ const Report = () => {
     fetchReport();
   }, [id]);
 
+  const fetchComparison = async (posSpec: string, playerId?: string) => {
+    try {
+      // Get all public players with same position_specific
+      const { data: peers } = await supabase
+        .from("player_stats_aggregate")
+        .select("player_id, avg_distance_per90, avg_top_speed, avg_sprint_distance_per90, avg_performance_score")
+        .order("avg_performance_score", { ascending: false });
+
+      if (!peers) return;
+
+      // Filter to same position by joining with profiles
+      const { data: posProfiles } = await supabase
+        .from("profiles")
+        .select("id, position_specific")
+        .eq("position_specific", posSpec)
+        .eq("is_public", true);
+
+      if (!posProfiles || posProfiles.length < 5) {
+        setComparisonInsufficient(true);
+        return;
+      }
+
+      const posIds = new Set(posProfiles.map(p => p.id));
+      const filtered = peers.filter(p => posIds.has(p.player_id));
+
+      if (filtered.length < 5) {
+        setComparisonInsufficient(true);
+        return;
+      }
+
+      // Build comparison metrics from current report
+      // We'll use player_stats_aggregate for ranking
+      const myStats = filtered.find(p => p.player_id === playerId);
+      const total = filtered.length;
+
+      const metrics: ComparisonMetric[] = [];
+
+      const rankBy = (arr: typeof filtered, key: string, label: string, val: string) => {
+        const sorted = [...arr].sort((a, b) => ((b as any)[key] || 0) - ((a as any)[key] || 0));
+        const idx = sorted.findIndex(p => p.player_id === playerId);
+        const rank = idx >= 0 ? idx + 1 : total;
+        metrics.push({ label, playerValue: val, rank, total, position: posSpec, percentile: Math.round(((total - rank) / total) * 100) });
+      };
+
+      if (myStats) {
+        rankBy(filtered, "avg_distance_per90", "Distance/90", myStats.avg_distance_per90 ? `${Math.round(myStats.avg_distance_per90).toLocaleString()} m/90` : "N/A");
+        rankBy(filtered, "avg_top_speed", "Top Speed", myStats.avg_top_speed ? `${myStats.avg_top_speed.toFixed(1)} km/h` : "N/A");
+        rankBy(filtered, "avg_sprint_distance_per90", "Sprint Distance/90", myStats.avg_sprint_distance_per90 ? `${Math.round(myStats.avg_sprint_distance_per90)} m/90` : "N/A");
+        rankBy(filtered, "avg_performance_score", "CPI Score", myStats.avg_performance_score ? `Avg: ${Math.round(myStats.avg_performance_score)}` : "N/A");
+        setComparison(metrics);
+      }
+    } catch (err) {
+      console.error("Comparison fetch error:", err);
+    }
+  };
+
+  const getCpiScore = (r: ReportData) => r.cpi ?? r.performanceScore ?? 0;
+
   const getScoreColor = (score: number) => {
-    if (score >= 75) return "text-[#1db954]";
-    if (score >= 50) return "text-amber-400";
+    if (score >= 75) return "text-[#1D9E75]";
+    if (score >= 45) return "text-amber-400";
     return "text-red-400";
   };
 
   const getScoreBg = (score: number) => {
-    if (score >= 75) return "bg-[#1db954]/15 border-[#1db954]/30";
-    if (score >= 50) return "bg-amber-400/15 border-amber-400/30";
+    if (score >= 75) return "bg-[#1D9E75]/15 border-[#1D9E75]/30";
+    if (score >= 45) return "bg-amber-400/15 border-amber-400/30";
     return "bg-red-400/15 border-red-400/30";
+  };
+
+  const getScoreLabel = (score: number) => {
+    if (score >= 90) return "Elite";
+    if (score >= 75) return "Excellent";
+    if (score >= 60) return "Good";
+    if (score >= 45) return "Average";
+    if (score >= 30) return "Below Average";
+    return "Needs Improvement";
   };
 
   if (loading) {
@@ -217,6 +277,8 @@ const Report = () => {
   ]
     .filter(Boolean)
     .join(" · ");
+
+  const cpi = report ? getCpiScore(report) : 0;
 
   return (
     <div className="min-h-screen bg-background">
@@ -289,15 +351,16 @@ const Report = () => {
 
         {report ? (
           <>
-            {/* Performance Score */}
+            {/* CPI Score */}
             <div className="rounded-2xl border border-border/50 bg-card p-6 text-center">
-              <div className={cn("inline-flex flex-col items-center justify-center w-24 h-24 rounded-full border-2 mb-4", getScoreBg(report.performanceScore))}>
-                <span className={cn("text-4xl font-bold", getScoreColor(report.performanceScore))}>
-                  {report.performanceScore}
+              <p className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground font-medium mb-3">Campometric Performance Index</p>
+              <div className={cn("inline-flex flex-col items-center justify-center w-24 h-24 rounded-full border-2 mb-4", getScoreBg(cpi))}>
+                <span className={cn("text-4xl font-bold", getScoreColor(cpi))}>
+                  {cpi}
                 </span>
               </div>
-              <p className={cn("text-sm font-medium mb-1", getScoreColor(report.performanceScore))}>
-                {report.performanceScore >= 75 ? "Excellent Output" : report.performanceScore >= 50 ? "Solid Performance" : "Below Average"}
+              <p className={cn("text-sm font-medium mb-1", getScoreColor(cpi))}>
+                {getScoreLabel(cpi)}
               </p>
               <p className="text-lg font-medium text-foreground mt-4">{report.headline}</p>
             </div>
@@ -313,7 +376,7 @@ const Report = () => {
               <h3 className="text-sm font-semibold text-foreground mb-4">Key Metrics</h3>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 {report.keyMetrics?.map((m) => {
-                  const ratingColor = m.rating === "elite" ? "text-[#1db954]" : m.rating === "good" ? "text-primary" : m.rating === "average" ? "text-amber-400" : "text-red-400";
+                  const ratingColor = m.rating === "elite" ? "text-[#1D9E75]" : m.rating === "good" ? "text-primary" : m.rating === "average" ? "text-amber-400" : "text-red-400";
                   return (
                     <div key={m.label} className="rounded-lg bg-secondary p-3">
                       <p className="text-[11px] text-muted-foreground">{m.label}</p>
@@ -329,7 +392,7 @@ const Report = () => {
 
             {/* Strengths & Improvements */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="rounded-2xl border border-border/50 bg-card p-5 border-l-[3px] border-l-[#1db954]">
+              <div className="rounded-2xl border border-border/50 bg-card p-5 border-l-[3px] border-l-[#1D9E75]">
                 <h3 className="text-sm font-semibold text-foreground mb-2">{report.standoutStrength?.title}</h3>
                 <p className="text-sm text-muted-foreground">{report.standoutStrength?.explanation}</p>
               </div>
@@ -351,13 +414,90 @@ const Report = () => {
               </div>
             </div>
 
-            {/* Training Recommendation */}
-            <div className="rounded-2xl border-l-[3px] border-l-primary bg-[#0d2a4a] p-5">
-              <p className="text-[12px] font-semibold text-primary mb-2">{report.trainingRecommendation?.title}</p>
-              <p className="text-sm text-[#a8c0e0] mb-1">{report.trainingRecommendation?.drill}</p>
-              <p className="text-[11px] text-muted-foreground">
-                {report.trainingRecommendation?.duration} · {report.trainingRecommendation?.intensity}
-              </p>
+            {/* How You Compare — PRO users see real data, FREE users see blurred */}
+            <div className="rounded-2xl border border-border/50 bg-card p-6 relative overflow-hidden">
+              <h3 className="text-sm font-semibold text-foreground mb-1">How You Compare</h3>
+              <p className="text-xs text-muted-foreground mb-4">Your position among Campometric players</p>
+
+              {userPlan === "free" ? (
+                <>
+                  {/* Blurred preview for free users */}
+                  <div className="grid grid-cols-2 gap-3 blur-md pointer-events-none select-none" aria-hidden>
+                    {["Distance/90", "Top Speed", "Sprint Distance/90", "CPI Score"].map(label => (
+                      <div key={label} className="rounded-lg bg-secondary p-4">
+                        <p className="text-[11px] text-muted-foreground">{label}</p>
+                        <p className="text-lg font-bold text-foreground">10,250 m/90</p>
+                        <p className="text-[10px] text-muted-foreground">Rank: #12 of 45</p>
+                        <div className="mt-2 h-1.5 bg-muted rounded-full overflow-hidden">
+                          <div className="h-full bg-[#1D9E75] rounded-full" style={{ width: "73%" }} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-card/80 backdrop-blur-sm">
+                    <Lock className="h-6 w-6 text-primary mb-3" />
+                    <p className="text-sm font-medium text-foreground text-center mb-1">
+                      Upgrade to Player Pro to see how you rank
+                    </p>
+                    <p className="text-xs text-muted-foreground text-center mb-4">
+                      Compare your metrics against other players in your position
+                    </p>
+                    <Button
+                      onClick={() => navigate("/#pricing")}
+                      className="bg-[#1D9E75] hover:bg-[#178a64] text-white font-semibold h-10 px-6"
+                    >
+                      Go Pro — €9/month
+                    </Button>
+                  </div>
+                </>
+              ) : comparisonInsufficient ? (
+                <div className="text-center py-6">
+                  <p className="text-sm text-muted-foreground mb-3">
+                    Not enough players with your position yet. Invite teammates to see how you compare!
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      navigator.clipboard.writeText(window.location.origin);
+                    }}
+                  >
+                    <Copy className="h-4 w-4 mr-2" /> Share Campometric
+                  </Button>
+                </div>
+              ) : comparison && comparison.length > 0 ? (
+                <div className="grid grid-cols-2 gap-3">
+                  {comparison.map(m => (
+                    <div key={m.label} className="rounded-lg bg-secondary p-4">
+                      <p className="text-[11px] text-muted-foreground">{m.label}</p>
+                      <p className="text-lg font-bold text-foreground">{m.playerValue}</p>
+                      <p className="text-[10px] text-muted-foreground">
+                        Rank: #{m.rank} of {m.total} {m.position}s
+                      </p>
+                      <div className="mt-2 h-1.5 bg-muted rounded-full overflow-hidden">
+                        <div
+                          className={cn("h-full rounded-full", m.percentile >= 75 ? "bg-[#1D9E75]" : m.percentile >= 45 ? "bg-amber-400" : "bg-red-400")}
+                          style={{ width: `${m.percentile}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-6">
+                  <p className="text-sm text-muted-foreground">
+                    Not enough players with your position yet. Invite teammates to see how you compare!
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-3"
+                    onClick={() => navigator.clipboard.writeText(window.location.origin)}
+                  >
+                    <Copy className="h-4 w-4 mr-2" /> Share Campometric
+                  </Button>
+                </div>
+              )}
             </div>
           </>
         ) : (
