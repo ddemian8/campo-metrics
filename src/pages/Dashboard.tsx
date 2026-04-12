@@ -248,6 +248,13 @@ const Dashboard = () => {
             </div>
           )}
         </div>
+
+        {/* Affiliate section */}
+        {hasAffiliate && profile && (
+          <div className="mt-10 pt-8 border-t border-border">
+            <AffiliateDashboardSection profileId={profile.id} />
+          </div>
+        )}
       </div>
     </div>
   );
