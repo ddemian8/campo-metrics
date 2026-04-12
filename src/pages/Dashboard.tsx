@@ -6,6 +6,7 @@ import { Loader2, Plus, LogOut, ChevronRight, Crown, Settings } from "lucide-rea
 import logo from "@/assets/logo.svg";
 import { cn } from "@/lib/utils";
 import { DataSourceBadge } from "@/components/DataSourceBadge";
+import AffiliateDashboardSection from "@/components/AffiliateDashboardSection";
 
 interface ReportRow {
   id: string;
@@ -27,6 +28,7 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<any>(null);
   const [reports, setReports] = useState<ReportRow[]>([]);
+  const [hasAffiliate, setHasAffiliate] = useState(false);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -53,6 +55,14 @@ const Dashboard = () => {
           .limit(50);
 
         setReports((reportData as any) || []);
+
+        // Check affiliate
+        const { data: aff } = await supabase
+          .from("affiliate_profiles")
+          .select("id")
+          .eq("user_id", profileData.id)
+          .maybeSingle();
+        setHasAffiliate(!!aff);
       }
 
       setLoading(false);
