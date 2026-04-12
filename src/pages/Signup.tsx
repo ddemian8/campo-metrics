@@ -150,6 +150,16 @@ const Signup = () => {
               <p className="text-xs text-muted-foreground mt-1">Have a friend on Campometric? Enter their code.</p>
             </div>
 
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1.5">Promo Code</label>
+              <Input
+                placeholder="Enter promo code (optional)"
+                value={promoCode}
+                onChange={(e) => setPromoCode(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground mt-1">Have a promo code? Enter it to unlock Pro features.</p>
+            </div>
+
             <Button
               type="submit"
               disabled={loading}
