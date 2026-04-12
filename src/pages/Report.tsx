@@ -13,7 +13,20 @@ import {
   Crown,
   Copy,
   AlertTriangle,
+  Trash2,
 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { DataSourceBadge } from "@/components/DataSourceBadge";
 
@@ -92,6 +105,9 @@ const Report = () => {
   const [comparison, setComparison] = useState<ComparisonMetric[] | null>(null);
   const [comparisonInsufficient, setComparisonInsufficient] = useState(false);
   const [playerUsername, setPlayerUsername] = useState<string | null>(null);
+  const [reportId, setReportId] = useState<string | null>(null);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -121,6 +137,7 @@ const Report = () => {
             input_method: sess?.input_method || null,
           });
           setIsPublic(reportRow.is_public);
+          setReportId(reportRow.id);
 
           // Fetch player username for public profile link
           if (reportRow.player_id) {
@@ -224,6 +241,22 @@ const Report = () => {
       }
     } catch (err) {
       console.error("Comparison fetch error:", err);
+    }
+  };
+
+  const handleDeleteReport = async () => {
+    if (!reportId || !id) return;
+    setDeleting(true);
+    try {
+      await supabase.from("reports").delete().eq("id", reportId);
+      await supabase.from("sessions").delete().eq("id", id);
+      toast.success("Report deleted");
+      navigate("/dashboard");
+    } catch {
+      toast.error("Failed to delete report");
+    } finally {
+      setDeleting(false);
+      setShowDeleteDialog(false);
     }
   };
 
@@ -534,6 +567,28 @@ const Report = () => {
               <ArrowLeft className="h-4 w-4 mr-2" /> Back to Dashboard
             </Button>
           </div>
+          <div className="flex justify-center">
+            {userPlan !== "free" ? (
+              <button
+                onClick={() => setShowDeleteDialog(true)}
+                className="text-xs text-red-400 hover:text-red-300 hover:underline inline-flex items-center gap-1"
+              >
+                <Trash2 className="h-3 w-3" /> Delete report
+              </button>
+            ) : (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="text-xs text-muted-foreground/40 cursor-not-allowed inline-flex items-center gap-1">
+                      <Trash2 className="h-3 w-3" /> Delete report
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent><p>Upgrade to Player Pro to manage your reports</p></TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )
+            }
+          </div>
           <p className="text-[11px] text-muted-foreground text-center">
             ✓ This report is visible on your public profile
           </p>
@@ -545,6 +600,28 @@ const Report = () => {
           )}
         </div>
       </div>
+
+      {/* Delete confirmation */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this report?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this report? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteReport}
+              className="bg-red-500 hover:bg-red-600"
+              disabled={deleting}
+            >
+              {deleting ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
