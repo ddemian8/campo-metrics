@@ -63,6 +63,32 @@ const Signup = () => {
           .eq("user_id", data.user.id);
       }
 
+      // Redeem promo code if provided
+      if (data.user && promoCode.trim()) {
+        const { data: code } = await supabase
+          .from("promo_codes")
+          .select("*")
+          .eq("code", promoCode.trim().toUpperCase())
+          .eq("is_active", true)
+          .single();
+
+        if (code && (!code.max_uses || code.times_used < code.max_uses) && (!code.expires_at || new Date(code.expires_at) > new Date())) {
+          const { data: profile } = await supabase.from("profiles").select("id").eq("user_id", data.user.id).single();
+          if (profile) {
+            const expiresAt = new Date();
+            expiresAt.setDate(expiresAt.getDate() + code.duration_days);
+            await supabase.from("promo_redemptions").insert({
+              promo_code_id: code.id,
+              user_id: data.user.id,
+              expires_at: expiresAt.toISOString(),
+              plan_type: code.plan_type,
+            });
+            await supabase.from("profiles").update({ subscription_plan: code.plan_type }).eq("user_id", data.user.id);
+            await supabase.from("promo_codes").update({ times_used: code.times_used + 1 }).eq("id", code.id);
+          }
+        }
+      }
+
       navigate(redirectTo);
     } catch {
       setGeneralError("Something went wrong. Please try again.");
