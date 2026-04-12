@@ -2,7 +2,19 @@ import { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Loader2, Plus, LogOut, ChevronRight, Crown, Settings } from "lucide-react";
+import { Loader2, Plus, LogOut, ChevronRight, Crown, Settings, Trash2 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { toast } from "sonner";
 import logo from "@/assets/logo.svg";
 import { cn } from "@/lib/utils";
 import { DataSourceBadge } from "@/components/DataSourceBadge";
@@ -29,6 +41,8 @@ const Dashboard = () => {
   const [profile, setProfile] = useState<any>(null);
   const [reports, setReports] = useState<ReportRow[]>([]);
   const [hasAffiliate, setHasAffiliate] = useState(false);
+  const [deleteReportId, setDeleteReportId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -84,6 +98,28 @@ const Dashboard = () => {
   }
 
   const isPaid = profile?.subscription_plan !== "free" || profile?.account_type !== "free";
+  const canDelete = isPaid;
+
+  const handleDeleteReport = async () => {
+    if (!deleteReportId || !profile) return;
+    setDeleting(true);
+    try {
+      const report = reports.find(r => r.id === deleteReportId);
+      // Delete report
+      await supabase.from("reports").delete().eq("id", deleteReportId);
+      // Delete associated session if exists
+      if (report?.session_id) {
+        await supabase.from("sessions").delete().eq("id", report.session_id);
+      }
+      setReports(prev => prev.filter(r => r.id !== deleteReportId));
+      toast.success("Report deleted successfully");
+    } catch (e) {
+      toast.error("Failed to delete report");
+    } finally {
+      setDeleting(false);
+      setDeleteReportId(null);
+    }
+  };
   const reportsUsed = profile?.reports_used_this_month || 0;
   const reportsRemaining = Math.max(0, 3 - reportsUsed);
   const canGenerate = isPaid || reportsUsed < 3;
@@ -240,14 +276,58 @@ const Dashboard = () => {
                       )}
                     </div>
 
-                    {/* Arrow */}
-                    <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                    {/* Delete / Arrow */}
+                    <div className="flex items-center gap-1 shrink-0">
+                      {canDelete ? (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setDeleteReportId(r.id); }}
+                          className="p-1.5 rounded hover:bg-red-500/10 text-muted-foreground hover:text-red-400 transition-colors"
+                          title="Delete report"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      ) : (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="p-1.5 text-muted-foreground/30 cursor-not-allowed">
+                                <Trash2 className="h-4 w-4" />
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent><p>Upgrade to Player Pro to manage your reports</p></TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      )}
+                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    </div>
                   </button>
                 );
               })}
             </div>
           )}
         </div>
+
+        {/* Delete confirmation */}
+        <AlertDialog open={!!deleteReportId} onOpenChange={(open) => { if (!open) setDeleteReportId(null); }}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete this report?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete this report? This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDeleteReport}
+                className="bg-red-500 hover:bg-red-600"
+                disabled={deleting}
+              >
+                {deleting ? "Deleting..." : "Delete"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         {/* Affiliate section */}
         {hasAffiliate && profile && (
