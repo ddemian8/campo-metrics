@@ -11,10 +11,12 @@ const Signup = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const redirectTo = searchParams.get("redirectTo") || "/dashboard";
+  const refParam = searchParams.get("ref") || "";
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [referralCode, setReferralCode] = useState("");
+  const [referralCode, setReferralCode] = useState(refParam);
+  const [promoCode, setPromoCode] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -60,6 +62,32 @@ const Signup = () => {
           .from("profiles")
           .update({ referred_by: referralCode.trim() })
           .eq("user_id", data.user.id);
+      }
+
+      // Redeem promo code if provided
+      if (data.user && promoCode.trim()) {
+        const { data: code } = await supabase
+          .from("promo_codes")
+          .select("*")
+          .eq("code", promoCode.trim().toUpperCase())
+          .eq("is_active", true)
+          .single();
+
+        if (code && (!code.max_uses || code.times_used < code.max_uses) && (!code.expires_at || new Date(code.expires_at) > new Date())) {
+          const { data: profile } = await supabase.from("profiles").select("id").eq("user_id", data.user.id).single();
+          if (profile) {
+            const expiresAt = new Date();
+            expiresAt.setDate(expiresAt.getDate() + code.duration_days);
+            await supabase.from("promo_redemptions").insert({
+              promo_code_id: code.id,
+              user_id: data.user.id,
+              expires_at: expiresAt.toISOString(),
+              plan_type: code.plan_type,
+            });
+            await supabase.from("profiles").update({ subscription_plan: code.plan_type }).eq("user_id", data.user.id);
+            await supabase.from("promo_codes").update({ times_used: code.times_used + 1 }).eq("id", code.id);
+          }
+        }
       }
 
       navigate(redirectTo);
@@ -148,6 +176,16 @@ const Signup = () => {
                 onChange={(e) => setReferralCode(e.target.value)}
               />
               <p className="text-xs text-muted-foreground mt-1">Have a friend on Campometric? Enter their code.</p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1.5">Promo Code</label>
+              <Input
+                placeholder="Enter promo code (optional)"
+                value={promoCode}
+                onChange={(e) => setPromoCode(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground mt-1">Have a promo code? Enter it to unlock Pro features.</p>
             </div>
 
             <Button
