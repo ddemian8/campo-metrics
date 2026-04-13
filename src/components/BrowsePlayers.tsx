@@ -10,6 +10,7 @@ interface LeaderboardEntry {
   player_id: string;
   value: number;
   full_name: string;
+  username: string | null;
   position: string;
   position_specific: string | null;
   current_club: string;
@@ -38,7 +39,7 @@ const BrowsePlayers = () => {
       const playerIds = statsData.map((s) => s.player_id);
       const { data: profiles } = await supabase
         .from("profiles")
-        .select("id, full_name, position, position_specific, current_club, country")
+        .select("id, full_name, username, position, position_specific, current_club, country")
         .in("id", playerIds);
 
       if (!profiles) return;
@@ -59,6 +60,7 @@ const BrowsePlayers = () => {
               player_id: s.player_id,
               value: Number(s[key]) || 0,
               full_name: p.full_name || "Unknown",
+              username: p.username || null,
               position: p.position || "—",
               position_specific: p.position_specific || null,
               current_club: p.current_club || "—",
@@ -111,7 +113,7 @@ const BrowsePlayers = () => {
       <div className="space-y-2.5">
         {entries.length > 0
           ? entries.map((entry, i) => (
-              <div key={entry.player_id} className="flex items-center gap-3">
+              <div key={entry.player_id} className="flex items-center gap-3 cursor-pointer hover:bg-secondary/50 rounded-lg px-1 py-0.5 transition-colors" onClick={() => entry.username && navigate(`/player/${entry.username}`)}>
                 <span className="text-xs font-bold text-muted-foreground w-5 text-right">
                   {i + 1}
                 </span>
