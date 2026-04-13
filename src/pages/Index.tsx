@@ -1,3 +1,4 @@
+import { useSearchParams } from "react-router-dom";
 import Navbar from "@/components/Navbar";
 import Hero from "@/components/Hero";
 import TrustBar from "@/components/TrustBar";
@@ -10,22 +11,29 @@ import Testimonials from "@/components/Testimonials";
 import AffiliateBanner from "@/components/AffiliateBanner";
 import FinalCTA from "@/components/FinalCTA";
 import Footer from "@/components/Footer";
+import AdminViewAsUserBanner from "@/components/admin/AdminViewAsUserBanner";
 
-const Index = () => (
-  <div className="min-h-screen">
-    <Navbar />
-    <Hero />
-    <BrowsePlayers />
-    <TrustBar />
-    <HowItWorks />
-    <ReportPreview />
-    <Flywheel />
-    <Pricing />
-    <Testimonials />
-    <AffiliateBanner />
-    <FinalCTA />
-    <Footer />
-  </div>
-);
+const Index = () => {
+  const [searchParams] = useSearchParams();
+  const isAdminPreview = searchParams.get("admin_preview") === "1";
+
+  return (
+    <div className="min-h-screen">
+      <Navbar />
+      <Hero />
+      <BrowsePlayers />
+      <TrustBar />
+      <HowItWorks />
+      <ReportPreview />
+      <Flywheel />
+      <Pricing />
+      <Testimonials />
+      <AffiliateBanner />
+      <FinalCTA />
+      <Footer />
+      {isAdminPreview && <AdminViewAsUserBanner />}
+    </div>
+  );
+};
 
 export default Index;
