@@ -23,6 +23,7 @@ import AdminAffiliates from "./pages/admin/AdminAffiliates.tsx";
 import AdminContent from "./pages/admin/AdminContent.tsx";
 import AdminLeaderboard from "./pages/admin/AdminLeaderboard.tsx";
 import AdminSettings from "./pages/admin/AdminSettings.tsx";
+import AdminFootballDatabase from "./pages/admin/AdminFootballDatabase.tsx";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
@@ -54,6 +55,7 @@ const App = () => (
           <Route path="/admin/content" element={<AdminContent />} />
           <Route path="/admin/leaderboard" element={<AdminLeaderboard />} />
           <Route path="/admin/settings" element={<AdminSettings />} />
+          <Route path="/admin/football" element={<AdminFootballDatabase />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

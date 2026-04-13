@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
   LayoutDashboard, Users, FileText, Tag, DollarSign, UserPlus,
-  Settings, BarChart3, Trophy, Menu, X, ChevronLeft
+  Settings, BarChart3, Trophy, Menu, X, ChevronLeft, Globe
 } from "lucide-react";
 import logo from "@/assets/logo.svg";
 import { cn } from "@/lib/utils";
@@ -16,6 +16,7 @@ const NAV = [
   { label: "Affiliates", path: "/admin/affiliates", icon: UserPlus },
   { label: "Content", path: "/admin/content", icon: BarChart3 },
   { label: "Leaderboard", path: "/admin/leaderboard", icon: Trophy },
+  { label: "Football DB", path: "/admin/football", icon: Globe },
   { label: "Settings", path: "/admin/settings", icon: Settings },
 ];
 

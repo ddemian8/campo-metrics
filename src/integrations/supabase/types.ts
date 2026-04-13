@@ -471,6 +471,110 @@ export type Database = {
           },
         ]
       }
+      football_countries: {
+        Row: {
+          code: string | null
+          flag_url: string | null
+          id: number
+          is_active: boolean
+          name: string
+        }
+        Insert: {
+          code?: string | null
+          flag_url?: string | null
+          id: number
+          is_active?: boolean
+          name: string
+        }
+        Update: {
+          code?: string | null
+          flag_url?: string | null
+          id?: number
+          is_active?: boolean
+          name?: string
+        }
+        Relationships: []
+      }
+      football_leagues: {
+        Row: {
+          country_id: number | null
+          id: number
+          is_active: boolean
+          logo_url: string | null
+          name: string
+          season: number | null
+          type: string | null
+        }
+        Insert: {
+          country_id?: number | null
+          id: number
+          is_active?: boolean
+          logo_url?: string | null
+          name: string
+          season?: number | null
+          type?: string | null
+        }
+        Update: {
+          country_id?: number | null
+          id?: number
+          is_active?: boolean
+          logo_url?: string | null
+          name?: string
+          season?: number | null
+          type?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "football_leagues_country_id_fkey"
+            columns: ["country_id"]
+            isOneToOne: false
+            referencedRelation: "football_countries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      football_teams: {
+        Row: {
+          country_id: number | null
+          id: number
+          is_active: boolean
+          league_id: number | null
+          logo_url: string | null
+          name: string
+        }
+        Insert: {
+          country_id?: number | null
+          id: number
+          is_active?: boolean
+          league_id?: number | null
+          logo_url?: string | null
+          name: string
+        }
+        Update: {
+          country_id?: number | null
+          id?: number
+          is_active?: boolean
+          league_id?: number | null
+          logo_url?: string | null
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "football_teams_country_id_fkey"
+            columns: ["country_id"]
+            isOneToOne: false
+            referencedRelation: "football_countries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "football_teams_league_id_fkey"
+            columns: ["league_id"]
+            isOneToOne: false
+            referencedRelation: "football_leagues"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       platform_settings: {
         Row: {
           id: string
@@ -584,6 +688,7 @@ export type Database = {
           affiliate_code: string | null
           avatar_url: string | null
           country: string | null
+          country_id: number | null
           created_at: string
           current_club: string | null
           current_league: string | null
@@ -592,6 +697,7 @@ export type Database = {
           height_cm: number | null
           id: string
           is_public: boolean
+          league_id: number | null
           paddle_customer_id: string | null
           paddle_subscription_id: string | null
           position: string | null
@@ -602,6 +708,7 @@ export type Database = {
           reports_used_this_month: number
           subscription_plan: string
           subscription_status: string
+          team_id: number | null
           transfermarkt_url: string | null
           updated_at: string
           user_id: string
@@ -613,6 +720,7 @@ export type Database = {
           affiliate_code?: string | null
           avatar_url?: string | null
           country?: string | null
+          country_id?: number | null
           created_at?: string
           current_club?: string | null
           current_league?: string | null
@@ -621,6 +729,7 @@ export type Database = {
           height_cm?: number | null
           id?: string
           is_public?: boolean
+          league_id?: number | null
           paddle_customer_id?: string | null
           paddle_subscription_id?: string | null
           position?: string | null
@@ -631,6 +740,7 @@ export type Database = {
           reports_used_this_month?: number
           subscription_plan?: string
           subscription_status?: string
+          team_id?: number | null
           transfermarkt_url?: string | null
           updated_at?: string
           user_id: string
@@ -642,6 +752,7 @@ export type Database = {
           affiliate_code?: string | null
           avatar_url?: string | null
           country?: string | null
+          country_id?: number | null
           created_at?: string
           current_club?: string | null
           current_league?: string | null
@@ -650,6 +761,7 @@ export type Database = {
           height_cm?: number | null
           id?: string
           is_public?: boolean
+          league_id?: number | null
           paddle_customer_id?: string | null
           paddle_subscription_id?: string | null
           position?: string | null
@@ -660,13 +772,36 @@ export type Database = {
           reports_used_this_month?: number
           subscription_plan?: string
           subscription_status?: string
+          team_id?: number | null
           transfermarkt_url?: string | null
           updated_at?: string
           user_id?: string
           username?: string | null
           weight_kg?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_country_id_fkey"
+            columns: ["country_id"]
+            isOneToOne: false
+            referencedRelation: "football_countries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profiles_league_id_fkey"
+            columns: ["league_id"]
+            isOneToOne: false
+            referencedRelation: "football_leagues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profiles_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "football_teams"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       promo_codes: {
         Row: {
@@ -888,6 +1023,42 @@ export type Database = {
           section?: string
           updated_at?: string
           updated_by?: string | null
+        }
+        Relationships: []
+      }
+      sync_progress: {
+        Row: {
+          created_at: string
+          entity_id: number | null
+          entity_name: string | null
+          id: string
+          items_synced: number
+          requests_used: number
+          status: string
+          sync_type: string
+          synced_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          entity_id?: number | null
+          entity_name?: string | null
+          id?: string
+          items_synced?: number
+          requests_used?: number
+          status?: string
+          sync_type: string
+          synced_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          entity_id?: number | null
+          entity_name?: string | null
+          id?: string
+          items_synced?: number
+          requests_used?: number
+          status?: string
+          sync_type?: string
+          synced_at?: string | null
         }
         Relationships: []
       }
