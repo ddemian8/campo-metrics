@@ -10,6 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { cn } from "@/lib/utils";
 import { format, differenceInYears } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
+import FootballDropdowns from "@/components/FootballDropdowns";
+import OpponentSearch from "@/components/OpponentSearch";
 
 type EntryMethod = "pdf" | "screenshot" | "manual";
 type PositionZone = "GK" | "DEF" | "MID" | "FWD";
@@ -68,6 +70,9 @@ interface FormState {
   teamName: string;
   league: string;
   country: string;
+  countryId: number | null;
+  leagueId: number | null;
+  teamId: number | null;
   sessionType: SessionType | null;
   mdDay: MDDay;
   opponent: string;
@@ -260,6 +265,9 @@ const Analyze = () => {
     teamName: "",
     league: "",
     country: "",
+    countryId: null,
+    leagueId: null,
+    teamId: null,
     sessionType: null,
     mdDay: "MD0",
     opponent: "",
