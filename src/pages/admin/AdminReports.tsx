@@ -3,11 +3,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAdmin } from "@/hooks/useAdmin";
 import AdminLayout from "@/components/admin/AdminLayout";
 import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Search, ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Loader2, ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
 
 const PAGE_SIZE = 20;
 
@@ -15,25 +13,22 @@ const AdminReports = () => {
   const { loading: authLoading } = useAdmin();
   const [reports, setReports] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [methodFilter, setMethodFilter] = useState("all");
   const [page, setPage] = useState(0);
   const [total, setTotal] = useState(0);
   const [stats, setStats] = useState({ total: 0, pdf: 0, screenshot: 0, manual: 0, avgCpi: 0 });
+  const [selectedUser, setSelectedUser] = useState<any>(null);
+  const [userReports, setUserReports] = useState<any[]>([]);
 
   const fetchReports = async () => {
     setLoading(true);
-    let query = supabase
+    const { data, count } = await supabase
       .from("reports")
-      .select("id, ai_report, created_at, sessions(session_type, input_method, session_date), profiles!reports_player_id_fkey(full_name)", { count: "exact" })
+      .select("id, ai_report, created_at, player_id, sessions(session_type, input_method, session_date), profiles!reports_player_id_fkey(full_name, username, subscription_plan, country, current_club, position_specific, position)", { count: "exact" })
       .order("created_at", { ascending: false })
       .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
-
-    const { data, count } = await query;
     setReports(data || []);
     setTotal(count || 0);
 
-    // Stats
     const { data: all } = await supabase.from("reports").select("ai_report, sessions(input_method)");
     const allReports = all || [];
     const pdfCount = allReports.filter((r: any) => r.sessions?.input_method === "pdf_upload").length;
@@ -42,11 +37,29 @@ const AdminReports = () => {
     const cpis = allReports.map((r: any) => r.ai_report?.cpi).filter(Boolean).map(Number);
     const avgCpi = cpis.length ? cpis.reduce((a: number, b: number) => a + b, 0) / cpis.length : 0;
     setStats({ total: allReports.length, pdf: pdfCount, screenshot: ssCount, manual: manCount, avgCpi });
-
     setLoading(false);
   };
 
   useEffect(() => { if (!authLoading) fetchReports(); }, [authLoading, page]);
+
+  const openUserProfile = async (playerId: string) => {
+    const { data: profile } = await supabase.from("profiles")
+      .select("*, player_stats_aggregate(avg_performance_score, trust_score, total_sessions)")
+      .eq("id", playerId).single();
+    const { data: reports } = await supabase.from("reports")
+      .select("id, ai_report, created_at, sessions(session_type, input_method)")
+      .eq("player_id", playerId).order("created_at", { ascending: false });
+    setSelectedUser(profile);
+    setUserReports(reports || []);
+  };
+
+  // Group reports by player_id and get per-player stats
+  const getPlayerStats = (playerId: string) => {
+    const playerReports = reports.filter(r => r.player_id === playerId);
+    const cpis = playerReports.map(r => r.ai_report?.cpi).filter(Boolean).map(Number);
+    const avgCpi = cpis.length ? cpis.reduce((a, b) => a + b, 0) / cpis.length : 0;
+    return { avgCpi, count: playerReports.length };
+  };
 
   if (authLoading) return <AdminLayout><Loader2 className="animate-spin text-primary mx-auto mt-32" size={32} /></AdminLayout>;
 
@@ -75,6 +88,7 @@ const AdminReports = () => {
                   <th className="p-3 text-muted-foreground font-medium">Player</th>
                   <th className="p-3 text-muted-foreground font-medium">Type</th>
                   <th className="p-3 text-muted-foreground font-medium">CPI</th>
+                  <th className="p-3 text-muted-foreground font-medium">Avg CPI</th>
                   <th className="p-3 text-muted-foreground font-medium">Input</th>
                   <th className="p-3 text-muted-foreground font-medium">Date</th>
                   <th className="p-3"></th>
@@ -82,17 +96,27 @@ const AdminReports = () => {
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={6} className="p-8 text-center"><Loader2 className="animate-spin mx-auto text-primary" /></td></tr>
-                ) : reports.map((r: any) => (
-                  <tr key={r.id} className="border-b border-border/50 hover:bg-muted/30">
-                    <td className="p-3">{(r.profiles as any)?.full_name || "—"}</td>
-                    <td className="p-3 capitalize">{r.sessions?.session_type || "—"}</td>
-                    <td className="p-3">{r.ai_report?.cpi || "—"}</td>
-                    <td className="p-3">{r.sessions?.input_method || "—"}</td>
-                    <td className="p-3 text-muted-foreground">{new Date(r.created_at).toLocaleDateString()}</td>
-                    <td className="p-3"><Link to={`/report/${r.id}`}><ExternalLink size={14} className="text-primary" /></Link></td>
-                  </tr>
-                ))}
+                  <tr><td colSpan={7} className="p-8 text-center"><Loader2 className="animate-spin mx-auto text-primary" /></td></tr>
+                ) : reports.length === 0 ? (
+                  <tr><td colSpan={7} className="p-8 text-center text-muted-foreground">No reports generated yet</td></tr>
+                ) : reports.map((r: any) => {
+                  const ps = getPlayerStats(r.player_id);
+                  return (
+                    <tr key={r.id} className="border-b border-border/50 hover:bg-muted/30 cursor-pointer" onClick={() => openUserProfile(r.player_id)}>
+                      <td className="p-3 text-primary hover:underline">{(r.profiles as any)?.full_name || "—"}</td>
+                      <td className="p-3 capitalize">{r.sessions?.session_type || "—"}</td>
+                      <td className="p-3">{r.ai_report?.cpi || "—"}</td>
+                      <td className="p-3">{ps.avgCpi ? ps.avgCpi.toFixed(1) : "—"}</td>
+                      <td className="p-3">{r.sessions?.input_method || "—"}</td>
+                      <td className="p-3 text-muted-foreground">{new Date(r.created_at).toLocaleDateString()}</td>
+                      <td className="p-3" onClick={(e) => e.stopPropagation()}>
+                        <a href={`/report/${r.id}`} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                          <ExternalLink size={14} />
+                        </a>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -107,6 +131,47 @@ const AdminReports = () => {
           <Button variant="outline" size="sm" disabled={(page + 1) * PAGE_SIZE >= total} onClick={() => setPage(p => p + 1)}><ChevronRight size={16} /></Button>
         </div>
       </div>
+
+      {/* User profile dialog */}
+      <Dialog open={!!selectedUser} onOpenChange={() => setSelectedUser(null)}>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>{selectedUser?.full_name || "User Detail"}</DialogTitle></DialogHeader>
+          <div className="space-y-3 text-sm">
+            <div className="grid grid-cols-2 gap-2">
+              <p><span className="text-muted-foreground">Username:</span> {selectedUser?.username || "—"}</p>
+              <p><span className="text-muted-foreground">Position:</span> {selectedUser?.position_specific || selectedUser?.position || "—"}</p>
+              <p><span className="text-muted-foreground">Club:</span> {selectedUser?.current_club || "—"}</p>
+              <p><span className="text-muted-foreground">Country:</span> {selectedUser?.country || "—"}</p>
+              <p><span className="text-muted-foreground">Plan:</span> {selectedUser?.subscription_plan}</p>
+              <p><span className="text-muted-foreground">Trust:</span> {(Array.isArray(selectedUser?.player_stats_aggregate) ? selectedUser?.player_stats_aggregate[0] : selectedUser?.player_stats_aggregate)?.trust_score || 0}</p>
+            </div>
+
+            <div className="pt-3 border-t border-border">
+              <p className="text-xs font-medium text-muted-foreground mb-2">Reports ({userReports.length})</p>
+              {userReports.length === 0 ? (
+                <p className="text-muted-foreground text-center py-2">No reports</p>
+              ) : (
+                <div className="space-y-2 max-h-60 overflow-y-auto">
+                  {userReports.map((r: any) => (
+                    <div key={r.id} className="flex items-center justify-between p-2 rounded bg-muted/30">
+                      <div>
+                        <span className="capitalize">{r.sessions?.session_type || "—"}</span>
+                        <span className="text-muted-foreground ml-2">CPI: {r.ai_report?.cpi || "—"}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground">{new Date(r.created_at).toLocaleDateString()}</span>
+                        <a href={`/report/${r.id}`} target="_blank" rel="noopener noreferrer" className="text-primary">
+                          <ExternalLink size={12} />
+                        </a>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </AdminLayout>
   );
 };

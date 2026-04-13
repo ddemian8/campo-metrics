@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, Users, FileText, Tag, DollarSign, UserPlus,
-  Settings, BarChart3, Trophy, Menu, X, ChevronLeft, Globe
+  Settings, BarChart3, Trophy, Menu, ChevronLeft, Globe, Eye
 } from "lucide-react";
 import logo from "@/assets/logo.svg";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
 const NAV = [
   { label: "Dashboard", path: "/admin", icon: LayoutDashboard },
@@ -22,11 +23,11 @@ const NAV = [
 
 const AdminLayout = ({ children }: { children: React.ReactNode }) => {
   const location = useLocation();
+  const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
 
   return (
     <div className="min-h-screen bg-background flex">
-      {/* Sidebar */}
       <aside className={cn(
         "fixed left-0 top-0 bottom-0 z-40 flex flex-col border-r border-border bg-card transition-all duration-200",
         collapsed ? "w-16" : "w-60"
@@ -63,15 +64,23 @@ const AdminLayout = ({ children }: { children: React.ReactNode }) => {
             );
           })}
         </nav>
-        <div className="p-4 border-t border-border">
-          <Link to="/dashboard" className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground">
+        <div className="p-3 border-t border-border space-y-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full justify-start gap-2 text-xs"
+            onClick={() => navigate("/?admin_preview=1")}
+          >
+            <Eye size={14} />
+            {!collapsed && "View as User"}
+          </Button>
+          <Link to="/dashboard" className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground px-1">
             <ChevronLeft size={14} />
             {!collapsed && "Back to Dashboard"}
           </Link>
         </div>
       </aside>
 
-      {/* Main */}
       <main className={cn("flex-1 transition-all duration-200", collapsed ? "ml-16" : "ml-60")}>
         <div className="p-6 md:p-8 max-w-7xl">
           {children}

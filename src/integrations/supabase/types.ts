@@ -685,6 +685,7 @@ export type Database = {
       profiles: {
         Row: {
           account_type: string
+          admin_notes: string | null
           affiliate_code: string | null
           avatar_url: string | null
           country: string | null
@@ -717,6 +718,7 @@ export type Database = {
         }
         Insert: {
           account_type?: string
+          admin_notes?: string | null
           affiliate_code?: string | null
           avatar_url?: string | null
           country?: string | null
@@ -749,6 +751,7 @@ export type Database = {
         }
         Update: {
           account_type?: string
+          admin_notes?: string | null
           affiliate_code?: string | null
           avatar_url?: string | null
           country?: string | null
