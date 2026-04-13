@@ -1449,23 +1449,21 @@ const Analyze = () => {
             {currentStepId === "team" && (
               <div>
                 <h1 className="text-3xl sm:text-4xl font-bold text-foreground mb-6">What team and league do you play in?</h1>
-                <div className="flex flex-col gap-4 max-w-md mx-auto">
-                  <div>
-                    <Input placeholder="e.g. FC Petrocub" value={form.teamName} onChange={(e) => updateForm({ teamName: e.target.value })} className="text-center text-lg h-12 bg-secondary border-border" />
-                    {errors.team && <p className="text-destructive text-xs mt-1">{errors.team}</p>}
-                  </div>
-                  <div>
-                    <Input placeholder="e.g. Divizia Națională" value={form.league} onChange={(e) => updateForm({ league: e.target.value })} className="text-center text-lg h-12 bg-secondary border-border" />
-                    {errors.league && <p className="text-destructive text-xs mt-1">{errors.league}</p>}
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <label className="text-[13px] font-medium text-foreground text-left">Country</label>
-                      <span className="text-[10px] text-muted-foreground bg-muted/30 px-1.5 py-0.5 rounded-full">Optional</span>
-                    </div>
-                    <Input placeholder="e.g. Moldova, Romania, Portugal..." value={form.country} onChange={(e) => updateForm({ country: e.target.value })} className="text-center text-lg h-12 bg-secondary border-border" />
-                  </div>
+                <div className="max-w-md mx-auto text-left">
+                  <FootballDropdowns
+                    countryId={form.countryId}
+                    leagueId={form.leagueId}
+                    teamId={form.teamId}
+                    countryName={form.country}
+                    leagueName={form.league}
+                    teamName={form.teamName}
+                    onCountryChange={(id, name) => updateForm({ countryId: id, country: name, leagueId: null, league: "", teamId: null, teamName: "" })}
+                    onLeagueChange={(id, name) => updateForm({ leagueId: id, league: name, teamId: null, teamName: "" })}
+                    onTeamChange={(id, name) => updateForm({ teamId: id, teamName: name })}
+                  />
                 </div>
+                {errors.team && <p className="text-destructive text-xs mt-3 text-center">{errors.team}</p>}
+                {errors.league && <p className="text-destructive text-xs mt-1 text-center">{errors.league}</p>}
                 <Button onClick={handleContinue} className="mt-8 h-12 px-8 text-base">Continue →</Button>
               </div>
             )}
@@ -1495,7 +1493,7 @@ const Analyze = () => {
                           {renderDateDropdowns("session_day", "session_month", "session_year", [currentYear - 2, currentYear], "When was the match?")}
                           <div>
                             <label className="text-[13px] font-medium text-foreground block mb-1.5">Opponent (optional)</label>
-                            <Input placeholder="e.g. FC Milsami" value={form.opponent} onChange={(e) => updateForm({ opponent: e.target.value })} className="h-11 bg-[#0d1f35] border-border" />
+                            <OpponentSearch value={form.opponent} onChange={(v) => updateForm({ opponent: v })} />
                           </div>
                           {errors.sessionDate && <p className="text-[11px] text-destructive">{errors.sessionDate}</p>}
                         </div>
