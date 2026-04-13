@@ -105,15 +105,15 @@ const BrowsePlayers = () => {
     entries: LeaderboardEntry[],
     unit: string
   ) => (
-    <div className="rounded-xl border border-border bg-card p-5">
-      <div className="flex items-center gap-2 mb-4">
+    <div className="rounded-xl border border-border bg-card p-6">
+      <div className="flex items-center gap-2 mb-5">
         {icon}
         <h3 className="text-sm font-semibold text-foreground">{title}</h3>
       </div>
-      <div className="space-y-2.5">
+      <div className="space-y-3.5">
         {entries.length > 0
           ? entries.map((entry, i) => (
-              <div key={entry.player_id} className="flex items-center gap-3 cursor-pointer hover:bg-secondary/50 rounded-lg px-1 py-0.5 transition-colors" onClick={() => entry.username && navigate(`/player/${entry.username}`)}>
+              <div key={entry.player_id} className="flex items-center gap-3 cursor-pointer hover:bg-secondary/50 rounded-lg px-2 py-2 transition-colors -mx-2" onClick={() => entry.username && navigate(`/player/${entry.username}`)}>
                 <span className="text-xs font-bold text-muted-foreground w-5 text-right">
                   {i + 1}
                 </span>
