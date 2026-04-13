@@ -1026,42 +1026,6 @@ export type Database = {
         }
         Relationships: []
       }
-      sync_progress: {
-        Row: {
-          created_at: string
-          entity_id: number | null
-          entity_name: string | null
-          id: string
-          items_synced: number
-          requests_used: number
-          status: string
-          sync_type: string
-          synced_at: string | null
-        }
-        Insert: {
-          created_at?: string
-          entity_id?: number | null
-          entity_name?: string | null
-          id?: string
-          items_synced?: number
-          requests_used?: number
-          status?: string
-          sync_type: string
-          synced_at?: string | null
-        }
-        Update: {
-          created_at?: string
-          entity_id?: number | null
-          entity_name?: string | null
-          id?: string
-          items_synced?: number
-          requests_used?: number
-          status?: string
-          sync_type?: string
-          synced_at?: string | null
-        }
-        Relationships: []
-      }
     }
     Views: {
       [_ in never]: never
