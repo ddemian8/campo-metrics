@@ -85,6 +85,8 @@ const getAge = (dob: string | null) => {
   return age;
 };
 
+const removeDiacritics = (str: string) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
 const FilterDropdown = ({
   label, options, value, onChange, renderOption,
 }: {
@@ -95,12 +97,27 @@ const FilterDropdown = ({
   renderOption?: (opt: any) => React.ReactNode;
 }) => {
   const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const ref = useRef<HTMLDivElement>(null);
   const selected = options.find(o => o.id === value);
+  const searchable = options.length > 5;
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const filtered = search
+    ? options.filter(o => removeDiacritics(o.name.toLowerCase()).includes(removeDiacritics(search.toLowerCase())))
+    : options;
 
   return (
-    <div className="relative">
+    <div className="relative" ref={ref}>
       <button
-        onClick={() => setOpen(!open)}
+        onClick={() => { setOpen(!open); setSearch(""); }}
         className={cn(
           "flex items-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-medium transition-colors whitespace-nowrap",
           value ? "bg-primary/10 text-primary border-primary/30" : "bg-card text-muted-foreground border-border hover:text-foreground"
@@ -112,23 +129,43 @@ const FilterDropdown = ({
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute z-50 mt-1 w-48 max-h-60 overflow-y-auto rounded-lg border border-border bg-card shadow-lg">
-            <button
-              onClick={() => { onChange(null); setOpen(false); }}
-              className={cn("w-full px-3 py-2 text-xs text-left hover:bg-secondary/50", !value && "font-medium text-primary")}
-            >
-              All {label.toLowerCase()}s
-            </button>
-            {options.map(opt => (
+          <div className="absolute z-50 mt-1 w-56 max-h-64 overflow-hidden rounded-lg border border-border bg-card shadow-lg">
+            {searchable && (
+              <div className="p-2 border-b border-border">
+                <div className="relative">
+                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+                  <input
+                    className="w-full pl-7 pr-2 py-1.5 text-xs bg-background border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-primary/50 text-foreground"
+                    placeholder="Search..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    autoFocus
+                  />
+                </div>
+              </div>
+            )}
+            <div className="overflow-y-auto max-h-48">
               <button
-                key={opt.id}
-                onClick={() => { onChange(opt.id); setOpen(false); }}
-                className={cn("w-full px-3 py-2 text-xs text-left hover:bg-secondary/50 flex items-center gap-2", value === opt.id && "font-medium text-primary")}
+                onClick={() => { onChange(null); setOpen(false); }}
+                className={cn("w-full px-3 py-2 text-xs text-left hover:bg-secondary/50", !value && "font-medium text-primary")}
               >
-                {opt.extra}
-                <span className="truncate">{opt.name}</span>
+                All {label.toLowerCase()}s
               </button>
-            ))}
+              {filtered.length === 0 ? (
+                <div className="px-3 py-3 text-xs text-muted-foreground text-center">No results found</div>
+              ) : (
+                filtered.map(opt => (
+                  <button
+                    key={opt.id}
+                    onClick={() => { onChange(opt.id); setOpen(false); }}
+                    className={cn("w-full px-3 py-2 text-xs text-left hover:bg-secondary/50 flex items-center gap-2", value === opt.id && "font-medium text-primary")}
+                  >
+                    {opt.extra}
+                    <span className="truncate">{opt.name}</span>
+                  </button>
+                ))
+              )}
+            </div>
           </div>
         </>
       )}

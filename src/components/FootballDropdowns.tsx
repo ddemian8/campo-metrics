@@ -63,8 +63,9 @@ const SearchableDropdown = ({
 
   if (!visible) return null;
 
+  const removeDiacritics = (str: string) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   const filtered = options.filter((o) =>
-    o.name.toLowerCase().includes(search.toLowerCase())
+    removeDiacritics(o.name.toLowerCase()).includes(removeDiacritics(search.toLowerCase()))
   );
 
   return (

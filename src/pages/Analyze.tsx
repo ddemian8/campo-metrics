@@ -515,8 +515,8 @@ const Analyze = () => {
       }
     }
     if (stepId === "team") {
-      if (!form.teamName.trim()) e.team = "Required";
-      if (!form.league.trim()) e.league = "Required";
+      if (!form.teamName.trim() && !form.teamId) e.team = "Please select or enter your team";
+      if (!form.league.trim() && !form.leagueId) e.league = "Please select or enter your league";
     }
     if (stepId === "session_info") {
       if (!form.sessionType) e.sessionType = "Required";
