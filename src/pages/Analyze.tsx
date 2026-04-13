@@ -10,6 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { cn } from "@/lib/utils";
 import { format, differenceInYears } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
+import FootballDropdowns from "@/components/FootballDropdowns";
+import OpponentSearch from "@/components/OpponentSearch";
 
 type EntryMethod = "pdf" | "screenshot" | "manual";
 type PositionZone = "GK" | "DEF" | "MID" | "FWD";
@@ -68,6 +70,9 @@ interface FormState {
   teamName: string;
   league: string;
   country: string;
+  countryId: number | null;
+  leagueId: number | null;
+  teamId: number | null;
   sessionType: SessionType | null;
   mdDay: MDDay;
   opponent: string;
@@ -260,6 +265,9 @@ const Analyze = () => {
     teamName: "",
     league: "",
     country: "",
+    countryId: null,
+    leagueId: null,
+    teamId: null,
     sessionType: null,
     mdDay: "MD0",
     opponent: "",
@@ -324,6 +332,9 @@ const Analyze = () => {
           teamName: profileData.current_club || prev.teamName,
           league: profileData.current_league || prev.league,
           country: profileData.country || prev.country,
+          countryId: (profileData as any).country_id || prev.countryId,
+          leagueId: (profileData as any).league_id || prev.leagueId,
+          teamId: (profileData as any).team_id || prev.teamId,
           ...(profileData.date_of_birth ? (() => {
             const [y, m, d] = profileData.date_of_birth.split("-");
             const dateObj = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
@@ -504,8 +515,8 @@ const Analyze = () => {
       }
     }
     if (stepId === "team") {
-      if (!form.teamName.trim()) e.team = "Required";
-      if (!form.league.trim()) e.league = "Required";
+      if (!form.teamName.trim() && !form.teamId) e.team = "Please select or enter your team";
+      if (!form.league.trim() && !form.leagueId) e.league = "Please select or enter your league";
     }
     if (stepId === "session_info") {
       if (!form.sessionType) e.sessionType = "Required";
@@ -771,6 +782,9 @@ const Analyze = () => {
         if (!profile.current_club && form.teamName) profileUpdates.current_club = form.teamName;
         if (!profile.current_league && form.league) profileUpdates.current_league = form.league;
         if (!profile.country && form.country) profileUpdates.country = form.country;
+        if (form.countryId) (profileUpdates as any).country_id = form.countryId;
+        if (form.leagueId) (profileUpdates as any).league_id = form.leagueId;
+        if (form.teamId) (profileUpdates as any).team_id = form.teamId;
         if (!profile.transfermarkt_url && form.transfermarkt_url) profileUpdates.transfermarkt_url = form.transfermarkt_url;
         if (Object.keys(profileUpdates).length > 0) {
           await supabase.from('profiles').update(profileUpdates).eq('id', profile.id);
@@ -1438,23 +1452,21 @@ const Analyze = () => {
             {currentStepId === "team" && (
               <div>
                 <h1 className="text-3xl sm:text-4xl font-bold text-foreground mb-6">What team and league do you play in?</h1>
-                <div className="flex flex-col gap-4 max-w-md mx-auto">
-                  <div>
-                    <Input placeholder="e.g. FC Petrocub" value={form.teamName} onChange={(e) => updateForm({ teamName: e.target.value })} className="text-center text-lg h-12 bg-secondary border-border" />
-                    {errors.team && <p className="text-destructive text-xs mt-1">{errors.team}</p>}
-                  </div>
-                  <div>
-                    <Input placeholder="e.g. Divizia Națională" value={form.league} onChange={(e) => updateForm({ league: e.target.value })} className="text-center text-lg h-12 bg-secondary border-border" />
-                    {errors.league && <p className="text-destructive text-xs mt-1">{errors.league}</p>}
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <label className="text-[13px] font-medium text-foreground text-left">Country</label>
-                      <span className="text-[10px] text-muted-foreground bg-muted/30 px-1.5 py-0.5 rounded-full">Optional</span>
-                    </div>
-                    <Input placeholder="e.g. Moldova, Romania, Portugal..." value={form.country} onChange={(e) => updateForm({ country: e.target.value })} className="text-center text-lg h-12 bg-secondary border-border" />
-                  </div>
+                <div className="max-w-md mx-auto text-left">
+                  <FootballDropdowns
+                    countryId={form.countryId}
+                    leagueId={form.leagueId}
+                    teamId={form.teamId}
+                    countryName={form.country}
+                    leagueName={form.league}
+                    teamName={form.teamName}
+                    onCountryChange={(id, name) => updateForm({ countryId: id, country: name, leagueId: null, league: "", teamId: null, teamName: "" })}
+                    onLeagueChange={(id, name) => updateForm({ leagueId: id, league: name, teamId: null, teamName: "" })}
+                    onTeamChange={(id, name) => updateForm({ teamId: id, teamName: name })}
+                  />
                 </div>
+                {errors.team && <p className="text-destructive text-xs mt-3 text-center">{errors.team}</p>}
+                {errors.league && <p className="text-destructive text-xs mt-1 text-center">{errors.league}</p>}
                 <Button onClick={handleContinue} className="mt-8 h-12 px-8 text-base">Continue →</Button>
               </div>
             )}
@@ -1484,7 +1496,7 @@ const Analyze = () => {
                           {renderDateDropdowns("session_day", "session_month", "session_year", [currentYear - 2, currentYear], "When was the match?")}
                           <div>
                             <label className="text-[13px] font-medium text-foreground block mb-1.5">Opponent (optional)</label>
-                            <Input placeholder="e.g. FC Milsami" value={form.opponent} onChange={(e) => updateForm({ opponent: e.target.value })} className="h-11 bg-[#0d1f35] border-border" />
+                            <OpponentSearch value={form.opponent} onChange={(v) => updateForm({ opponent: v })} />
                           </div>
                           {errors.sessionDate && <p className="text-[11px] text-destructive">{errors.sessionDate}</p>}
                         </div>
