@@ -332,6 +332,9 @@ const Analyze = () => {
           teamName: profileData.current_club || prev.teamName,
           league: profileData.current_league || prev.league,
           country: profileData.country || prev.country,
+          countryId: (profileData as any).country_id || prev.countryId,
+          leagueId: (profileData as any).league_id || prev.leagueId,
+          teamId: (profileData as any).team_id || prev.teamId,
           ...(profileData.date_of_birth ? (() => {
             const [y, m, d] = profileData.date_of_birth.split("-");
             const dateObj = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
