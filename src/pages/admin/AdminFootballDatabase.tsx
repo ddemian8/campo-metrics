@@ -47,7 +47,7 @@ const AdminFootballDatabase = () => {
   useEffect(() => { fetchData(); }, []);
 
   const toggleActive = async (table: string, id: number, currentVal: boolean) => {
-    await supabase.from(table).update({ is_active: !currentVal }).eq("id", id);
+    await (supabase.from(table as any) as any).update({ is_active: !currentVal }).eq("id", id);
     fetchData();
     toast.success("Updated");
   };
