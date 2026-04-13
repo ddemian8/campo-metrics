@@ -782,6 +782,9 @@ const Analyze = () => {
         if (!profile.current_club && form.teamName) profileUpdates.current_club = form.teamName;
         if (!profile.current_league && form.league) profileUpdates.current_league = form.league;
         if (!profile.country && form.country) profileUpdates.country = form.country;
+        if (form.countryId) (profileUpdates as any).country_id = form.countryId;
+        if (form.leagueId) (profileUpdates as any).league_id = form.leagueId;
+        if (form.teamId) (profileUpdates as any).team_id = form.teamId;
         if (!profile.transfermarkt_url && form.transfermarkt_url) profileUpdates.transfermarkt_url = form.transfermarkt_url;
         if (Object.keys(profileUpdates).length > 0) {
           await supabase.from('profiles').update(profileUpdates).eq('id', profile.id);
