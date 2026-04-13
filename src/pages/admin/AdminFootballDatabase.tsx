@@ -247,7 +247,7 @@ const AdminFootballDatabase = () => {
           flag_url: c.flag_url || null, is_active: true,
         });
         if (insertErr) { log.push(`❌ Error adding country ${c.name}: ${insertErr.message}`); continue; }
-        allCountries.push({ id: countryId, name: c.name });
+        allCountries.push({ id: countryId, name: c.name, code: c.code || null, flag_url: c.flag_url || null, is_active: true } as any);
         log.push(`✅ Added country: ${c.name}`);
       }
 
@@ -264,7 +264,7 @@ const AdminFootballDatabase = () => {
             type: l.type || "league", season: l.season || 2025, is_active: true,
           });
           if (insertErr) { log.push(`❌ Error adding league ${l.name}: ${insertErr.message}`); continue; }
-          allLeagues.push({ id: leagueId, name: l.name, country_id: countryId });
+          allLeagues.push({ id: leagueId, name: l.name, country_id: countryId, type: l.type || "league", season: l.season || 2025, is_active: true, logo_url: null } as any);
           log.push(`✅ Added league: ${l.name} (${c.name})`);
         }
 
@@ -281,7 +281,7 @@ const AdminFootballDatabase = () => {
           });
           if (insertErr) { log.push(`❌ Error adding team ${teamName}: ${insertErr.message}`); }
           else {
-            allTeams.push({ id: teamId, name: teamName, league_id: leagueId });
+            allTeams.push({ id: teamId, name: teamName, league_id: leagueId, country_id: countryId, is_active: true, logo_url: null } as any);
             log.push(`✅ Added team: ${teamName} (${l.name}, ${c.name})`);
           }
         }
@@ -388,7 +388,7 @@ const AdminFootballDatabase = () => {
                 {importPreview.map((line, i) => (
                   <p key={i} className={cn(
                     "text-xs font-mono",
-                    line.startsWith("✅") ? "text-green-500" :
+                    line.startsWith("✅") ? "text-primary" :
                     line.startsWith("⏭️") ? "text-muted-foreground" :
                     line.startsWith("❌") ? "text-destructive" :
                     "text-foreground font-semibold"
