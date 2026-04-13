@@ -9,6 +9,7 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { toast } from "sonner";
 import { Loader2, Camera, Check, X, ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
+import FootballDropdowns from "@/components/FootballDropdowns";
 
 const POSITION_ZONES = [
   { zone: "GK", label: "Goalkeeper", positions: ["GK"] },
@@ -36,6 +37,9 @@ const Settings = () => {
   const [currentClub, setCurrentClub] = useState("");
   const [currentLeague, setCurrentLeague] = useState("");
   const [country, setCountry] = useState("");
+  const [countryId, setCountryId] = useState<number | null>(null);
+  const [leagueId, setLeagueId] = useState<number | null>(null);
+  const [teamId, setTeamId] = useState<number | null>(null);
   const [transfermarktUrl, setTransfermarktUrl] = useState("");
   const [username, setUsername] = useState("");
   const [isPublic] = useState(true);
@@ -78,6 +82,9 @@ const Settings = () => {
         setCurrentClub(p.current_club || "");
         setCurrentLeague(p.current_league || "");
         setCountry(p.country || "");
+        setCountryId((p as any).country_id || null);
+        setLeagueId((p as any).league_id || null);
+        setTeamId((p as any).team_id || null);
         setTransfermarktUrl(p.transfermarkt_url || "");
         setUsername(p.username || "");
         // is_public is always true — no toggle needed
@@ -144,6 +151,9 @@ const Settings = () => {
         current_club: currentClub || null,
         current_league: currentLeague || null,
         country: country || null,
+        country_id: countryId,
+        league_id: leagueId,
+        team_id: teamId,
         transfermarkt_url: transfermarktUrl || null,
         username: username || null,
         is_public: isPublic,
@@ -303,18 +313,17 @@ const Settings = () => {
               </div>
             )}
 
-            <div>
-              <Label>Current Club</Label>
-              <Input value={currentClub} onChange={(e) => setCurrentClub(e.target.value)} className="mt-1.5 bg-card" />
-            </div>
-            <div>
-              <Label>Current League</Label>
-              <Input value={currentLeague} onChange={(e) => setCurrentLeague(e.target.value)} className="mt-1.5 bg-card" />
-            </div>
-            <div>
-              <Label>Country</Label>
-              <Input value={country} onChange={(e) => setCountry(e.target.value)} className="mt-1.5 bg-card" />
-            </div>
+            <FootballDropdowns
+              countryId={countryId}
+              leagueId={leagueId}
+              teamId={teamId}
+              countryName={country}
+              leagueName={currentLeague}
+              teamName={currentClub}
+              onCountryChange={(id, name) => { setCountryId(id); setCountry(name); }}
+              onLeagueChange={(id, name) => { setLeagueId(id); setCurrentLeague(name); }}
+              onTeamChange={(id, name) => { setTeamId(id); setCurrentClub(name); }}
+            />
             <div>
               <Label>Transfermarkt URL</Label>
               <Input value={transfermarktUrl} onChange={(e) => setTransfermarktUrl(e.target.value)} placeholder="https://www.transfermarkt.com/..." className="mt-1.5 bg-card" />
