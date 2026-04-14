@@ -707,7 +707,10 @@ export type Database = {
           referred_by: string | null
           reports_reset_date: string | null
           reports_used_this_month: number
+          subscription_cancel_at: string | null
+          subscription_current_period_end: string | null
           subscription_plan: string
+          subscription_started_at: string | null
           subscription_status: string
           team_id: number | null
           transfermarkt_url: string | null
@@ -740,7 +743,10 @@ export type Database = {
           referred_by?: string | null
           reports_reset_date?: string | null
           reports_used_this_month?: number
+          subscription_cancel_at?: string | null
+          subscription_current_period_end?: string | null
           subscription_plan?: string
+          subscription_started_at?: string | null
           subscription_status?: string
           team_id?: number | null
           transfermarkt_url?: string | null
@@ -773,7 +779,10 @@ export type Database = {
           referred_by?: string | null
           reports_reset_date?: string | null
           reports_used_this_month?: number
+          subscription_cancel_at?: string | null
+          subscription_current_period_end?: string | null
           subscription_plan?: string
+          subscription_started_at?: string | null
           subscription_status?: string
           team_id?: number | null
           transfermarkt_url?: string | null
@@ -1028,6 +1037,47 @@ export type Database = {
           updated_by?: string | null
         }
         Relationships: []
+      }
+      transactions: {
+        Row: {
+          amount: number
+          created_at: string
+          currency: string
+          id: string
+          paddle_transaction_id: string | null
+          plan_type: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          currency?: string
+          id?: string
+          paddle_transaction_id?: string | null
+          plan_type?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          currency?: string
+          id?: string
+          paddle_transaction_id?: string | null
+          plan_type?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
