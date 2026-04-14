@@ -791,6 +791,9 @@ const Analyze = () => {
         }
       }
 
+      // Mark session as completed so DB trigger can process it
+      await supabase.from('sessions').update({ status: 'completed' }).eq('id', sessionId);
+
       // IMMEDIATELY redirect to report page — no intermediate screen
       navigate(`/report/${sessionId}`, { replace: true });
     } catch (err) {

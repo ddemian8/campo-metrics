@@ -160,7 +160,7 @@ const Dashboard = () => {
 
       await supabase.from("player_stats_aggregate").update({
         avg_distance_per90: getAvg(pdfList, "distance"), avg_sprint_distance_per90: getAvg(pdfList, "dist_sp_z5"),
-        avg_hsr_per90: getAvg(pdfList, "hmld"), avg_top_speed: getAvg(pdfList, "max_sp"),
+        avg_hsr_per90: getAvg(pdfList, "dist_sp_z4plus"), avg_top_speed: getAvg(pdfList, "max_sp"),
         avg_accelerations_per90: getAvg(pdfList, "acc_ev"), avg_decelerations_per90: getAvg(pdfList, "dec_ev"),
         avg_sprints_per90: getAvg(pdfList, "sp_ev"),
         avg_performance_score: cpiVals.length > 0 ? cpiVals.reduce((a, b) => a + b, 0) / cpiVals.length : null,
