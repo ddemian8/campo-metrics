@@ -1061,7 +1061,7 @@ const Analyze = () => {
         <Lock className="h-12 w-12 text-muted-foreground mb-4" />
         <h1 className="text-2xl font-bold text-foreground mb-2">You've used all 3 free reports this month</h1>
         <p className="text-muted-foreground mb-8 max-w-md">
-          Upgrade to Player Pro for unlimited reports — €9/month
+          Upgrade to Player Pro for unlimited reports — €9/month (+ tax)
         </p>
         <div className="flex flex-col sm:flex-row gap-3">
           <Button

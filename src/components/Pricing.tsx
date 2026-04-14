@@ -120,10 +120,15 @@ const Pricing = () => {
                     </span>
                   )}
                   <h3 className="text-lg font-bold">{p.name}</h3>
-                  <p className="mt-2 mb-6">
-                    <span className="text-3xl font-bold">{p.price}</span>
-                    <span className="text-sm text-muted-foreground">{p.period}</span>
-                  </p>
+                  <div className="mt-2 mb-6">
+                    <div>
+                      <span className="text-3xl font-bold">{p.price}</span>
+                      <span className="text-sm text-muted-foreground">{p.period}{p.price !== "€0" && "*"}</span>
+                    </div>
+                    {p.price !== "€0" && (
+                      <p className="text-[11px] text-muted-foreground/60 mt-0.5">excl. tax</p>
+                    )}
+                  </div>
                   <ul className="space-y-3 mb-8 flex-1">
                     {p.features.map((f) => (
                       <li
@@ -150,7 +155,10 @@ const Pricing = () => {
 
         <AnimateIn delay={0.3}>
           <p className="text-center text-[12px] text-muted-foreground mt-10">
-            7-day money-back guarantee on all paid plans. All prices exclude applicable tax. Payments processed securely by Paddle. Cancel anytime.
+            7-day money-back guarantee on all paid plans. Payments processed securely by Paddle. Cancel anytime.
+          </p>
+          <p className="text-center text-[11px] text-muted-foreground/60 mt-2">
+            * Prices exclude applicable tax (VAT). Final amount including tax will be shown at checkout before payment.
           </p>
         </AnimateIn>
 
