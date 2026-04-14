@@ -10,9 +10,9 @@ import { AdminDateRangeSelector, getDefaultDateRange, getPreviousPeriod, calcCha
 const AdminSales = () => {
   const { loading: authLoading } = useAdmin();
   const [range, setRange] = useState<DateRange>(getDefaultDateRange);
-  const [stats, setStats] = useState({ mrr: 0, proCount: 0, clubCount: 0, totalSubs: 0 });
-  const [prevStats, setPrevStats] = useState({ mrr: 0, proCount: 0, clubCount: 0, totalSubs: 0 });
-  const [subscribers, setSubscribers] = useState<any[]>([]);
+  const [stats, setStats] = useState({ revenue: 0, proCount: 0, clubCount: 0, totalSubs: 0 });
+  const [prevStats, setPrevStats] = useState({ revenue: 0, proCount: 0, clubCount: 0, totalSubs: 0 });
+  const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -23,23 +23,27 @@ const AdminSales = () => {
       const to = range.to.toISOString();
       const prev = getPreviousPeriod(range);
 
-      const { data: profiles } = await supabase.from("profiles").select("*")
-        .in("subscription_plan", ["player_pro", "club"]);
-      const all = profiles || [];
+      // Fetch real transactions
+      const { data: txns } = await supabase.from("transactions").select("*, profiles(full_name, subscription_plan)").gte("created_at", from).lte("created_at", to).order("created_at", { ascending: false });
+      const { data: prevTxns } = await supabase.from("transactions").select("*").gte("created_at", prev.from.toISOString()).lte("created_at", prev.to.toISOString());
 
-      const inRange = all.filter(p => p.created_at >= from && p.created_at <= to);
-      const inPrev = all.filter(p => p.created_at >= prev.from.toISOString() && p.created_at <= prev.to.toISOString());
+      const all = txns || [];
+      const prevAll = prevTxns || [];
 
-      const pro = inRange.filter(p => p.subscription_plan === "player_pro");
-      const club = inRange.filter(p => p.subscription_plan === "club");
-      const mrr = pro.length * 9 + club.length * 59;
+      const completed = all.filter(t => t.status === "completed");
+      const prevCompleted = prevAll.filter(t => t.status === "completed");
 
-      const prevPro = inPrev.filter(p => p.subscription_plan === "player_pro");
-      const prevClub = inPrev.filter(p => p.subscription_plan === "club");
+      const revenue = completed.reduce((sum, t) => sum + Number(t.amount), 0);
+      const prevRevenue = prevCompleted.reduce((sum, t) => sum + Number(t.amount), 0);
 
-      setStats({ mrr, proCount: pro.length, clubCount: club.length, totalSubs: pro.length + club.length });
-      setPrevStats({ mrr: prevPro.length * 9 + prevClub.length * 59, proCount: prevPro.length, clubCount: prevClub.length, totalSubs: prevPro.length + prevClub.length });
-      setSubscribers(inRange.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
+      const proCount = completed.filter(t => t.plan_type === "player_pro").length;
+      const clubCount = completed.filter(t => t.plan_type === "club").length;
+      const prevProCount = prevCompleted.filter(t => t.plan_type === "player_pro").length;
+      const prevClubCount = prevCompleted.filter(t => t.plan_type === "club").length;
+
+      setStats({ revenue, proCount, clubCount, totalSubs: proCount + clubCount });
+      setPrevStats({ revenue: prevRevenue, proCount: prevProCount, clubCount: prevClubCount, totalSubs: prevProCount + prevClubCount });
+      setTransactions(all);
       setLoading(false);
     };
     load();
@@ -48,19 +52,19 @@ const AdminSales = () => {
   if (authLoading || loading) return <AdminLayout><Loader2 className="animate-spin text-primary mx-auto mt-32" size={32} /></AdminLayout>;
 
   const cards = [
-    { l: "Revenue", v: `€${stats.mrr}`, prev: prevStats.mrr, raw: stats.mrr, icon: DollarSign },
-    { l: "Pro Subscribers", v: stats.proCount, prev: prevStats.proCount, raw: stats.proCount, icon: TrendingUp },
-    { l: "Club Subscribers", v: stats.clubCount, prev: prevStats.clubCount, raw: stats.clubCount, icon: Users },
-    { l: "Total Active", v: stats.totalSubs, prev: prevStats.totalSubs, raw: stats.totalSubs, icon: Users },
+    { l: "Revenue", v: `€${stats.revenue.toFixed(2)}`, prev: prevStats.revenue, raw: stats.revenue, icon: DollarSign },
+    { l: "Pro Transactions", v: stats.proCount, prev: prevStats.proCount, raw: stats.proCount, icon: TrendingUp },
+    { l: "Club Transactions", v: stats.clubCount, prev: prevStats.clubCount, raw: stats.clubCount, icon: Users },
+    { l: "Total Transactions", v: stats.totalSubs, prev: prevStats.totalSubs, raw: stats.totalSubs, icon: Users },
   ];
 
   const exportCSV = () => {
-    const rows = subscribers.map(s => `${s.full_name || ""},${s.subscription_plan},${s.subscription_status},${s.created_at}`);
-    const csv = `Name,Plan,Status,Joined\n${rows.join("\n")}`;
+    const rows = transactions.map(t => `${(t as any).profiles?.full_name || ""},${t.plan_type},${t.status},€${t.amount},${t.currency},${t.created_at}`);
+    const csv = `Name,Plan,Status,Amount,Currency,Date\n${rows.join("\n")}`;
     const blob = new Blob([csv], { type: "text/csv" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = "subscribers.csv";
+    a.download = "transactions.csv";
     a.click();
   };
 
@@ -94,7 +98,7 @@ const AdminSales = () => {
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-base">Subscribers</CardTitle>
+          <CardTitle className="text-base">Transactions</CardTitle>
           <Button variant="outline" size="sm" onClick={exportCSV}><Download size={14} className="mr-1" />Export CSV</Button>
         </CardHeader>
         <CardContent className="p-0">
@@ -104,19 +108,25 @@ const AdminSales = () => {
                 <tr className="border-b border-border text-left">
                   <th className="p-3 text-muted-foreground font-medium">Name</th>
                   <th className="p-3 text-muted-foreground font-medium">Plan</th>
+                  <th className="p-3 text-muted-foreground font-medium">Amount</th>
                   <th className="p-3 text-muted-foreground font-medium">Status</th>
-                  <th className="p-3 text-muted-foreground font-medium">Joined</th>
+                  <th className="p-3 text-muted-foreground font-medium">Date</th>
                 </tr>
               </thead>
               <tbody>
-                {subscribers.length === 0 ? (
-                  <tr><td colSpan={4} className="p-8 text-center text-muted-foreground">No sales recorded yet</td></tr>
-                ) : subscribers.map(s => (
-                  <tr key={s.id} className="border-b border-border/50">
-                    <td className="p-3">{s.full_name || "—"}</td>
-                    <td className="p-3 capitalize">{s.subscription_plan.replace("_", " ")}</td>
-                    <td className="p-3"><span className="text-xs px-2 py-0.5 rounded-full bg-green-500/20 text-green-400">{s.subscription_status === "none" ? "promo" : s.subscription_status}</span></td>
-                    <td className="p-3 text-muted-foreground">{new Date(s.created_at).toLocaleDateString()}</td>
+                {transactions.length === 0 ? (
+                  <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">No sales recorded yet</td></tr>
+                ) : transactions.map(t => (
+                  <tr key={t.id} className="border-b border-border/50">
+                    <td className="p-3">{(t as any).profiles?.full_name || "—"}</td>
+                    <td className="p-3 capitalize">{(t.plan_type || "").replace("_", " ")}</td>
+                    <td className="p-3">€{Number(t.amount).toFixed(2)}</td>
+                    <td className="p-3">
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${t.status === "completed" ? "bg-green-500/20 text-green-400" : t.status === "failed" ? "bg-red-500/20 text-red-400" : "bg-muted text-muted-foreground"}`}>
+                        {t.status}
+                      </span>
+                    </td>
+                    <td className="p-3 text-muted-foreground">{new Date(t.created_at).toLocaleDateString()}</td>
                   </tr>
                 ))}
               </tbody>

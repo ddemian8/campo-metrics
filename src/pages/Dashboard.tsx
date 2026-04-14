@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Loader2, Plus, LogOut, ChevronRight, Crown, Settings, Trash2 } from "lucide-react";
+import { Loader2, Plus, LogOut, ChevronRight, Crown, Settings, Trash2, PartyPopper } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,6 +19,7 @@ import logo from "@/assets/logo.svg";
 import { cn } from "@/lib/utils";
 import { DataSourceBadge } from "@/components/DataSourceBadge";
 import AffiliateDashboardSection from "@/components/AffiliateDashboardSection";
+import { usePaddle } from "@/hooks/usePaddle";
 
 interface ReportRow {
   id: string;
@@ -37,12 +38,15 @@ interface ReportRow {
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<any>(null);
   const [reports, setReports] = useState<ReportRow[]>([]);
   const [hasAffiliate, setHasAffiliate] = useState(false);
   const [deleteReportId, setDeleteReportId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [paymentBanner, setPaymentBanner] = useState<string | null>(null);
+  const { openCheckout } = usePaddle();
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -80,9 +84,18 @@ const Dashboard = () => {
       }
 
       setLoading(false);
+
+      // Check payment success
+      const paymentStatus = searchParams.get("payment");
+      const planParam = searchParams.get("plan");
+      if (paymentStatus === "success") {
+        setPaymentBanner(planParam === "club" ? "Club" : "Player Pro");
+        setSearchParams({}, { replace: true });
+        setTimeout(() => setPaymentBanner(null), 10000);
+      }
     };
     checkAuth();
-  }, [navigate]);
+  }, [navigate, searchParams, setSearchParams]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -156,6 +169,22 @@ const Dashboard = () => {
         </h1>
         <p className="text-muted-foreground mb-8">Your performance dashboard</p>
 
+        {/* Payment success banner */}
+        {paymentBanner && (
+          <div className="rounded-xl border border-[#1D9E75]/30 bg-[#1D9E75]/10 p-5 mb-8 flex items-center gap-3">
+            <PartyPopper className="h-6 w-6 text-[#1D9E75] shrink-0" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-foreground">
+                🎉 Welcome to {paymentBanner}! Your subscription is now active.
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Enjoy unlimited reports and all premium features.
+              </p>
+            </div>
+            <button onClick={() => setPaymentBanner(null)} className="text-muted-foreground hover:text-foreground text-sm">✕</button>
+          </div>
+        )}
+
         {/* Stats cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           {[
@@ -184,7 +213,7 @@ const Dashboard = () => {
                   Want unlimited reports + Pro badge? Upgrade to Pro — €9/month
                 </p>
                 <Button
-                  onClick={() => navigate("/#pricing")}
+                  onClick={() => openCheckout("pro")}
                   className="bg-[#1D9E75] hover:bg-[#178a64] text-white font-semibold h-9 px-5 text-sm"
                 >
                   Upgrade to Pro →
