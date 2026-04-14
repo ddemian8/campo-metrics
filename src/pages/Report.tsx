@@ -292,6 +292,24 @@ async function recalculatePlayerStats(playerId: string) {
       updated_at: new Date().toISOString(),
     };
 
+    // Safety check: if player has reports but all metric averages are NULL, don't overwrite
+    if (reportList.length > 0 && avgDistance === null && avgTopSpeed === null && avgPerf === null && avgHsr === null) {
+      console.warn("Safety: player has reports but all computed averages are NULL. GPS data keys may not match. Updating session counts only.");
+      const safeData = {
+        total_sessions: totalSessions,
+        total_matches: matchCount,
+        total_trainings: trainingCount,
+        pdf_session_count: pdfCount,
+        screenshot_session_count: screenshotCount,
+        manual_session_count: manualCount,
+        trust_score: trust,
+        last_session_date: lastDate,
+        updated_at: new Date().toISOString(),
+      };
+      await supabase.from("player_stats_aggregate").update(safeData).eq("player_id", playerId);
+      return;
+    }
+
     const { error } = await supabase
       .from("player_stats_aggregate")
       .update(statsData)
