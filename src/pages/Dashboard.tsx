@@ -113,19 +113,82 @@ const Dashboard = () => {
   const isPaid = profile?.subscription_plan !== "free" || profile?.account_type !== "free";
   const canDelete = isPaid;
 
+  const recalculatePlayerStats = async (playerId: string) => {
+    try {
+      const { data: pdfSessions } = await supabase
+        .from("sessions").select("id, gps_data, session_type, input_method, session_date")
+        .eq("player_id", playerId).eq("status", "completed").eq("input_method", "pdf_upload");
+      const { data: allSessions } = await supabase
+        .from("sessions").select("id, gps_data, session_type, input_method, session_date")
+        .eq("player_id", playerId).eq("status", "completed");
+      const { data: allReports } = await supabase
+        .from("reports").select("id, ai_report, session_id").eq("player_id", playerId);
+
+      const pdfList = pdfSessions || [];
+      const allList = allSessions || [];
+      const reportList = allReports || [];
+      const totalSessions = allList.length;
+      const pdfCount = allList.filter(s => s.input_method === "pdf_upload").length;
+      const screenshotCount = allList.filter(s => s.input_method === "screenshot").length;
+      const manualCount = allList.filter(s => s.input_method === "manual").length;
+      const matchCount = allList.filter(s => s.session_type === "match").length;
+      const trainingCount = allList.filter(s => s.session_type === "training").length;
+      const lastDate = allList.length > 0
+        ? allList.sort((a, b) => (b.session_date || "").localeCompare(a.session_date || ""))[0]?.session_date
+        : null;
+
+      const getAvg = (arr: any[], key: string) => {
+        const vals = arr.map(s => { const g = s.gps_data as any; return g?.[key] ? parseFloat(g[key]) : null; }).filter((v): v is number => v !== null);
+        return vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+      };
+      const getMax = (arr: any[], key: string) => {
+        const vals = arr.map(s => { const g = s.gps_data as any; return g?.[key] ? parseFloat(g[key]) : null; }).filter((v): v is number => v !== null);
+        return vals.length > 0 ? Math.max(...vals) : null;
+      };
+
+      const pdfSessionIds = new Set(pdfList.map(s => s.id));
+      const pdfReports = reportList.filter(r => pdfSessionIds.has(r.session_id));
+      const cpiVals = pdfReports.map(r => { const ai = r.ai_report as any; return ai?.cpi ? parseFloat(ai.cpi) : null; }).filter((v): v is number => v !== null);
+      const allCpis = reportList.map(r => { const ai = r.ai_report as any; return ai?.cpi ? parseFloat(ai.cpi) : null; }).filter((v): v is number => v !== null);
+
+      const { data: prof } = await supabase.from("profiles").select("transfermarkt_url, current_club").eq("id", playerId).maybeSingle();
+      let trust = 0;
+      if (totalSessions > 0) trust += Math.min(40, Math.round((pdfCount / totalSessions) * 40));
+      trust += Math.min(20, totalSessions);
+      if (prof?.transfermarkt_url) trust += 20;
+      if (prof?.current_club) trust += 20;
+
+      await supabase.from("player_stats_aggregate").update({
+        avg_distance_per90: getAvg(pdfList, "distance"), avg_sprint_distance_per90: getAvg(pdfList, "dist_sp_z5"),
+        avg_hsr_per90: getAvg(pdfList, "hmld"), avg_top_speed: getAvg(pdfList, "max_sp"),
+        avg_accelerations_per90: getAvg(pdfList, "acc_ev"), avg_decelerations_per90: getAvg(pdfList, "dec_ev"),
+        avg_sprints_per90: getAvg(pdfList, "sp_ev"),
+        avg_performance_score: cpiVals.length > 0 ? cpiVals.reduce((a, b) => a + b, 0) / cpiVals.length : null,
+        best_top_speed: getMax(allList, "max_sp"), best_distance_single_match: getMax(allList, "distance"),
+        best_sprint_distance_single: getMax(allList, "dist_sp_z5"),
+        best_performance_score: allCpis.length > 0 ? Math.max(...allCpis) : null,
+        total_sessions: totalSessions, total_matches: matchCount, total_trainings: trainingCount,
+        pdf_session_count: pdfCount, screenshot_session_count: screenshotCount, manual_session_count: manualCount,
+        trust_score: trust, last_session_date: lastDate, updated_at: new Date().toISOString(),
+      }).eq("player_id", playerId);
+    } catch (err) {
+      console.error("recalculatePlayerStats error:", err);
+    }
+  };
+
   const handleDeleteReport = async () => {
     if (!deleteReportId || !profile) return;
     setDeleting(true);
     try {
       const report = reports.find(r => r.id === deleteReportId);
-      // Delete report
       await supabase.from("reports").delete().eq("id", deleteReportId);
-      // Delete associated session if exists
       if (report?.session_id) {
         await supabase.from("sessions").delete().eq("id", report.session_id);
       }
       setReports(prev => prev.filter(r => r.id !== deleteReportId));
-      toast.success("Report deleted successfully");
+      // Recalculate stats so leaderboard updates immediately
+      await recalculatePlayerStats(profile.id);
+      toast.success("Report deleted — leaderboard updated");
     } catch (e) {
       toast.error("Failed to delete report");
     } finally {
