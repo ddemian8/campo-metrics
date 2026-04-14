@@ -1,10 +1,10 @@
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import {
-  Loader2, Download, Share2, ExternalLink, ChevronRight, ArrowLeft,
+  Loader2, Download, Share2, ChevronRight, ArrowLeft,
   Copy, AlertTriangle, Trash2, ChevronDown, Lightbulb, Info,
 } from "lucide-react";
 import {
@@ -18,7 +18,7 @@ import { cn } from "@/lib/utils";
 import { DataSourceBadge } from "@/components/DataSourceBadge";
 import {
   getBenchmark, getCpiRatingKey, CPI_RATING_MAP, METRIC_EXPLANATIONS,
-  type RatingLevel,
+  getElitePercentage, getMetricRating,
 } from "@/lib/benchmarks";
 
 interface KeyMetric {
@@ -33,6 +33,22 @@ interface StrengthDetail {
   metric: string;
   explanation: string;
   tip: string;
+}
+
+interface RawExtractedData {
+  player_name_found?: string;
+  duration_raw?: string;
+  duration_minutes?: number;
+  distance_meters?: number;
+  distance_km?: number;
+  accelerations?: number;
+  decelerations?: number;
+  hsr_meters?: number;
+  sprint_distance_meters?: number;
+  top_speed_kmh?: number;
+  avg_speed_kmh?: number;
+  sprint_events?: number;
+  hmld_meters?: number;
 }
 
 interface ReportData {
@@ -51,19 +67,12 @@ interface ReportData {
   positionalContext: string;
   motivationalClose: string;
   dataFlags?: string[];
+  raw_extracted_data?: RawExtractedData;
 }
 
 interface GpsData {
   first_name?: string;
   last_name?: string;
-  date_of_birth?: string;
-  age_calculated?: number;
-  height_cm?: number;
-  weight_kg?: number;
-  team_name?: string;
-  league?: string;
-  country?: string;
-  transfermarkt_url?: string;
   position_zone?: string;
   duration?: string;
   distance?: number;
@@ -87,21 +96,37 @@ interface ComparisonMetric {
   percentile: number;
 }
 
-const positionColors: Record<string, string> = {
-  GK: "bg-muted text-muted-foreground",
-  DEF: "bg-primary/20 text-primary",
-  MID: "bg-[#0d3320] text-[#1db954]",
-  FWD: "bg-red-500/20 text-red-400",
+const ratingColorMap: Record<string, { text: string; bar: string; label: string; badge: string }> = {
+  elite: { text: "text-purple-400", bar: "bg-purple-500", label: "Elite", badge: "bg-purple-500/20 text-purple-400" },
+  excellent: { text: "text-[#1D9E75]", bar: "bg-[#1D9E75]", label: "Excellent", badge: "bg-[#1D9E75]/20 text-[#1D9E75]" },
+  good: { text: "text-primary", bar: "bg-primary", label: "Good", badge: "bg-primary/20 text-primary" },
+  average: { text: "text-yellow-400", bar: "bg-yellow-400", label: "Average", badge: "bg-yellow-400/20 text-yellow-400" },
+  developing: { text: "text-orange-400", bar: "bg-orange-400", label: "Developing", badge: "bg-orange-400/20 text-orange-400" },
+  above_average: { text: "text-[#1D9E75]", bar: "bg-[#1D9E75]", label: "Excellent", badge: "bg-[#1D9E75]/20 text-[#1D9E75]" },
+  below_average: { text: "text-orange-400", bar: "bg-orange-400", label: "Developing", badge: "bg-orange-400/20 text-orange-400" },
+  needs_improvement: { text: "text-orange-400", bar: "bg-orange-400", label: "Developing", badge: "bg-orange-400/20 text-orange-400" },
 };
 
-const ratingColorMap: Record<string, { text: string; bar: string; label: string }> = {
-  elite: { text: "text-purple-400", bar: "bg-purple-500", label: "Elite for your position" },
-  above_average: { text: "text-[#1D9E75]", bar: "bg-[#1D9E75]", label: "Above average" },
-  good: { text: "text-[#1D9E75]", bar: "bg-[#1D9E75]", label: "Above average" },
-  average: { text: "text-primary", bar: "bg-primary", label: "Average" },
-  below_average: { text: "text-orange-400", bar: "bg-orange-400", label: "Below average" },
-  below: { text: "text-orange-400", bar: "bg-orange-400", label: "Below average" },
-  needs_improvement: { text: "text-red-400", bar: "bg-red-400", label: "Needs improvement" },
+// Map metric labels to benchmark keys
+const metricToBenchmarkKey: Record<string, string> = {
+  "Total Distance": "distance",
+  "High-Speed Running": "hsr",
+  "Sprint Distance": "sprintDist",
+  "Top Speed": "topSpeed",
+  "Accelerations": "accelerations",
+  "Decelerations": "decelerations",
+  "HMLD": "hmld",
+};
+
+// Units for elite benchmarks display
+const metricUnits: Record<string, string> = {
+  "Total Distance": "km/90",
+  "High-Speed Running": "m/90",
+  "Sprint Distance": "m/90",
+  "Top Speed": "km/h",
+  "Accelerations": "/90",
+  "Decelerations": "/90",
+  "HMLD": "m/90",
 };
 
 function parseMetricValue(val: string): number | null {
@@ -110,18 +135,10 @@ function parseMetricValue(val: string): number | null {
   return isNaN(num) ? null : num;
 }
 
-function getMetricPercentage(value: string, benchmark: string): number {
-  const v = parseMetricValue(value);
-  const b = parseMetricValue(benchmark);
-  if (v === null || b === null || b === 0) return 50;
-  return Math.min(100, Math.max(5, (v / b) * 50 + 25));
-}
-
-// Animated bar component
 const AnimatedBar = ({ percentage, color, delay = 0 }: { percentage: number; color: string; delay?: number }) => {
   const [width, setWidth] = useState(0);
   useEffect(() => {
-    const t = setTimeout(() => setWidth(percentage), 100 + delay * 100);
+    const t = setTimeout(() => setWidth(Math.min(100, percentage)), 100 + delay * 100);
     return () => clearTimeout(t);
   }, [percentage, delay]);
 
@@ -135,6 +152,139 @@ const AnimatedBar = ({ percentage, color, delay = 0 }: { percentage: number; col
   );
 };
 
+// Recalculate player stats after report changes
+async function recalculatePlayerStats(playerId: string) {
+  try {
+    // Get all remaining completed sessions for this player (PDF only for leaderboard)
+    const { data: pdfSessions } = await supabase
+      .from("sessions")
+      .select("id, gps_data, session_type, input_method, session_date")
+      .eq("player_id", playerId)
+      .eq("status", "completed")
+      .eq("input_method", "pdf_upload");
+
+    const { data: allSessions } = await supabase
+      .from("sessions")
+      .select("id, gps_data, session_type, input_method, session_date")
+      .eq("player_id", playerId)
+      .eq("status", "completed");
+
+    const { data: allReports } = await supabase
+      .from("reports")
+      .select("id, ai_report, session_id")
+      .eq("player_id", playerId);
+
+    // PDF sessions for leaderboard averages
+    const pdfList = pdfSessions || [];
+    const allList = allSessions || [];
+    const reportList = allReports || [];
+
+    const totalSessions = allList.length;
+    const pdfCount = allList.filter(s => s.input_method === "pdf_upload").length;
+    const screenshotCount = allList.filter(s => s.input_method === "screenshot").length;
+    const manualCount = allList.filter(s => s.input_method === "manual").length;
+    const matchCount = allList.filter(s => s.session_type === "match").length;
+    const trainingCount = allList.filter(s => s.session_type === "training").length;
+    const lastDate = allList.length > 0
+      ? allList.sort((a, b) => (b.session_date || "").localeCompare(a.session_date || ""))[0]?.session_date
+      : null;
+
+    // Calculate averages from PDF sessions only
+    const getAvg = (arr: any[], key: string) => {
+      const vals = arr.map(s => {
+        const gps = s.gps_data as any;
+        return gps?.[key] ? parseFloat(gps[key]) : null;
+      }).filter((v): v is number => v !== null);
+      return vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+    };
+
+    const avgDistance = getAvg(pdfList, "distance");
+    const avgSprintDist = getAvg(pdfList, "dist_sp_z5");
+    const avgHsr = getAvg(pdfList, "hmld");
+    const avgTopSpeed = getAvg(pdfList, "max_sp");
+    const avgAccel = getAvg(pdfList, "acc_ev");
+    const avgDecel = getAvg(pdfList, "dec_ev");
+    const avgSprints = getAvg(pdfList, "sp_ev");
+
+    // CPI averages from PDF reports
+    const pdfSessionIds = new Set(pdfList.map(s => s.id));
+    const pdfReports = reportList.filter(r => pdfSessionIds.has(r.session_id));
+    const cpiVals = pdfReports.map(r => {
+      const ai = r.ai_report as any;
+      return ai?.cpi ? parseFloat(ai.cpi) : null;
+    }).filter((v): v is number => v !== null);
+    const avgPerf = cpiVals.length > 0 ? cpiVals.reduce((a, b) => a + b, 0) / cpiVals.length : null;
+
+    // Best values from ALL sessions
+    const getMax = (arr: any[], key: string) => {
+      const vals = arr.map(s => {
+        const gps = s.gps_data as any;
+        return gps?.[key] ? parseFloat(gps[key]) : null;
+      }).filter((v): v is number => v !== null);
+      return vals.length > 0 ? Math.max(...vals) : null;
+    };
+
+    const bestTopSpeed = getMax(allList, "max_sp");
+    const bestDistance = getMax(allList, "distance");
+    const bestSprint = getMax(allList, "dist_sp_z5");
+
+    // Best CPI from ALL reports
+    const allCpis = reportList.map(r => {
+      const ai = r.ai_report as any;
+      return ai?.cpi ? parseFloat(ai.cpi) : null;
+    }).filter((v): v is number => v !== null);
+    const bestPerf = allCpis.length > 0 ? Math.max(...allCpis) : null;
+
+    // Trust score
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("transfermarkt_url, current_club")
+      .eq("id", playerId)
+      .maybeSingle();
+
+    let trust = 0;
+    if (totalSessions > 0) trust += Math.min(40, Math.round((pdfCount / totalSessions) * 40));
+    trust += Math.min(20, totalSessions);
+    if (profile?.transfermarkt_url) trust += 20;
+    if (profile?.current_club) trust += 20;
+
+    // Upsert stats
+    const statsData = {
+      player_id: playerId,
+      avg_distance_per90: avgDistance,
+      avg_sprint_distance_per90: avgSprintDist,
+      avg_hsr_per90: avgHsr,
+      avg_top_speed: avgTopSpeed,
+      avg_accelerations_per90: avgAccel,
+      avg_decelerations_per90: avgDecel,
+      avg_sprints_per90: avgSprints,
+      avg_performance_score: avgPerf,
+      best_top_speed: bestTopSpeed,
+      best_distance_single_match: bestDistance,
+      best_sprint_distance_single: bestSprint,
+      best_performance_score: bestPerf,
+      total_sessions: totalSessions,
+      total_matches: matchCount,
+      total_trainings: trainingCount,
+      pdf_session_count: pdfCount,
+      screenshot_session_count: screenshotCount,
+      manual_session_count: manualCount,
+      trust_score: trust,
+      last_session_date: lastDate,
+      updated_at: new Date().toISOString(),
+    };
+
+    const { error } = await supabase
+      .from("player_stats_aggregate")
+      .update(statsData)
+      .eq("player_id", playerId);
+
+    if (error) console.error("Failed to recalculate stats:", error);
+  } catch (err) {
+    console.error("recalculatePlayerStats error:", err);
+  }
+}
+
 const Report = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -144,7 +294,6 @@ const Report = () => {
   const [error, setError] = useState<string | null>(null);
   const [userPlan, setUserPlan] = useState<string>("free");
   const [reportsUsed, setReportsUsed] = useState(0);
-  const [isPublic, setIsPublic] = useState(false);
   const [comparison, setComparison] = useState<ComparisonMetric[] | null>(null);
   const [comparisonInsufficient, setComparisonInsufficient] = useState(false);
   const [playerUsername, setPlayerUsername] = useState<string | null>(null);
@@ -152,6 +301,7 @@ const Report = () => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [posPlayerCount, setPosPlayerCount] = useState(0);
+  const [showRawData, setShowRawData] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -182,7 +332,6 @@ const Report = () => {
             player_id: reportRow.player_id,
             input_method: sess?.input_method || null,
           });
-          setIsPublic(reportRow.is_public);
           setReportId(reportRow.id);
 
           if (reportRow.player_id) {
@@ -282,12 +431,15 @@ const Report = () => {
   };
 
   const handleDeleteReport = async () => {
-    if (!reportId || !id) return;
+    if (!reportId || !id || !session?.player_id) return;
     setDeleting(true);
     try {
+      const playerId = session.player_id;
       await supabase.from("reports").delete().eq("id", reportId);
       await supabase.from("sessions").delete().eq("id", id);
-      toast.success("Report deleted");
+      // Recalculate stats so leaderboard updates immediately
+      await recalculatePlayerStats(playerId);
+      toast.success("Report deleted — leaderboard updated");
       navigate("/dashboard");
     } catch {
       toast.error("Failed to delete report");
@@ -332,12 +484,11 @@ const Report = () => {
 
   const gps = session.gps_data || {};
   const fullName = session.player_name || `${gps.first_name || ""} ${gps.last_name || ""}`.trim() || "Unknown";
-  const nameParts = fullName.split(" ");
-  const initials = `${nameParts[0]?.[0] || ""}${nameParts[nameParts.length - 1]?.[0] || ""}`.toUpperCase();
   const posSpecific = session.position_specific || gps.position_zone || "";
   const cpi = report ? getCpiScore(report) : 0;
   const ratingKey = getCpiRatingKey(cpi);
-  const rating = CPI_RATING_MAP[ratingKey];
+  const rating = CPI_RATING_MAP[ratingKey] || CPI_RATING_MAP.average;
+  const benchmark = getBenchmark(posSpecific);
 
   return (
     <div className="min-h-screen bg-background">
@@ -430,14 +581,12 @@ const Report = () => {
               transition={{ delay: 0.1 }}
               className="rounded-2xl border border-border/50 bg-gradient-to-br from-card via-card to-secondary/30 p-8 text-center relative overflow-hidden"
             >
-              {/* Subtle glow */}
               <div className={cn(
                 "absolute inset-0 opacity-10 blur-3xl",
                 ratingKey === "elite" ? "bg-purple-500" :
                 ratingKey === "excellent" ? "bg-[#1D9E75]" :
                 ratingKey === "good" ? "bg-primary" :
-                ratingKey === "average" ? "bg-yellow-400" :
-                ratingKey === "below_average" ? "bg-orange-500" : "bg-red-500"
+                ratingKey === "average" ? "bg-yellow-400" : "bg-orange-500"
               )} />
 
               <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground font-medium mb-4 relative">
@@ -455,8 +604,7 @@ const Report = () => {
                       ratingKey === "elite" ? "#a855f7" :
                       ratingKey === "excellent" ? "#1D9E75" :
                       ratingKey === "good" ? "hsl(218, 92%, 57%)" :
-                      ratingKey === "average" ? "#facc15" :
-                      ratingKey === "below_average" ? "#f97316" : "#ef4444"
+                      ratingKey === "average" ? "#facc15" : "#f97316"
                     }
                     strokeDasharray={`${(cpi / 100) * 327} 327`}
                     initial={{ strokeDasharray: "0 327" }}
@@ -489,7 +637,6 @@ const Report = () => {
                 <p className="text-sm text-muted-foreground mt-3">{rating.description}</p>
               </motion.div>
 
-              {/* Headline */}
               <p className="text-base font-medium text-foreground mt-4 relative">{report.headline}</p>
 
               {/* Percentile Bar */}
@@ -518,7 +665,7 @@ const Report = () => {
                   </div>
                 ) : (
                   <p className="text-xs text-muted-foreground">
-                    Your CPI of <span className="text-foreground font-semibold">{cpi}</span> is <span className="font-semibold">{rating.label}</span> compared to professional {posSpecific || "player"} benchmarks
+                    Your CPI of <span className="text-foreground font-semibold">{cpi}</span> is <span className="font-semibold">{rating.label}</span> compared to elite {posSpecific || "player"} benchmarks
                   </p>
                 )}
               </motion.div>
@@ -540,7 +687,6 @@ const Report = () => {
               </motion.div>
             )}
 
-            {/* Executive Summary (if no quick_summary, show this more prominently) */}
             {!report.quick_summary && (
               <div className="rounded-2xl border border-border/50 bg-card p-6">
                 <h3 className="text-sm font-semibold text-foreground mb-3">Executive Summary</h3>
@@ -570,10 +716,16 @@ const Report = () => {
               <h3 className="text-sm font-semibold text-foreground">Key Metrics</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {report.keyMetrics?.map((m, idx) => {
-                  const rKey = m.rating || "average";
-                  const rConfig = ratingColorMap[rKey] || ratingColorMap.average;
                   const metaInfo = METRIC_EXPLANATIONS[m.label];
-                  const pct = getMetricPercentage(m.per90 !== "N/A" ? m.per90 : m.value, m.benchmark);
+                  const benchKey = metricToBenchmarkKey[m.label];
+                  const eliteBenchVal = benchKey ? (benchmark as any)[benchKey] : null;
+                  const unit = metricUnits[m.label] || "";
+
+                  // Calculate percentage vs elite benchmark
+                  const playerVal = parseMetricValue(m.per90 !== "N/A" ? m.per90 : m.value);
+                  const elitePct = playerVal !== null && eliteBenchVal ? getElitePercentage(playerVal, eliteBenchVal) : 50;
+                  const computedRating = playerVal !== null && eliteBenchVal ? getMetricRating(playerVal, eliteBenchVal) : (m.rating || "average");
+                  const rConfig = ratingColorMap[computedRating] || ratingColorMap.average;
 
                   return (
                     <div key={m.label} className="rounded-xl border border-border/50 bg-card p-4 space-y-3">
@@ -585,16 +737,24 @@ const Report = () => {
                       <div>
                         <p className="text-xs text-muted-foreground mb-0.5">YOUR VALUE</p>
                         <p className="text-2xl font-bold text-foreground">{m.per90 !== "N/A" ? m.per90 : m.value}</p>
+                        {m.per90 !== "N/A" && m.value && m.value !== m.per90 && (
+                          <p className="text-[11px] text-muted-foreground">Raw: {m.value}</p>
+                        )}
                       </div>
 
                       <div className="space-y-1">
-                        <AnimatedBar percentage={pct} color={rConfig.bar} delay={idx} />
-                        <p className="text-[11px] text-muted-foreground">
-                          ↑ Average for {posSpecific || "position"}: {m.benchmark}
-                        </p>
+                        <AnimatedBar percentage={Math.min(100, elitePct)} color={rConfig.bar} delay={idx} />
+                        <div className="flex justify-between items-center">
+                          <p className="text-[11px] text-muted-foreground">
+                            {eliteBenchVal ? `Elite ${posSpecific || "benchmark"}: ${eliteBenchVal} ${unit}` : `Benchmark: ${m.benchmark}`}
+                          </p>
+                          <p className="text-[11px] font-medium" style={{ color: rConfig.text.replace("text-", "") }}>
+                            {playerVal !== null && eliteBenchVal ? `${Math.round(elitePct)}%` : ""}
+                          </p>
+                        </div>
                       </div>
 
-                      <span className={cn("inline-block text-xs font-semibold px-2 py-0.5 rounded-full bg-secondary", rConfig.text)}>
+                      <span className={cn("inline-block text-xs font-semibold px-2 py-0.5 rounded-full", rConfig.badge)}>
                         {rConfig.label}
                       </span>
 
@@ -670,22 +830,11 @@ const Report = () => {
               </div>
             </motion.div>
 
-            {/* 7. POSITIONAL CONTEXT */}
+            {/* 7. HOW YOU COMPARE */}
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.7 }}
-              className="rounded-xl border border-border/50 bg-card p-5"
-            >
-              <h3 className="text-sm font-semibold text-foreground mb-2">Positional Context</h3>
-              <p className="text-sm text-muted-foreground leading-relaxed">{report.positionalContext}</p>
-            </motion.div>
-
-            {/* 8. HOW YOU COMPARE */}
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.8 }}
               className="rounded-2xl border border-border/50 bg-card p-6 relative overflow-hidden"
             >
               <h3 className="text-sm font-semibold text-foreground mb-1">How You Compare</h3>
@@ -720,12 +869,103 @@ const Report = () => {
                 </div>
               ) : (
                 <div className="text-center py-6">
-                  <p className="text-sm text-muted-foreground">
-                    Not enough players with your position yet.
-                  </p>
+                  <p className="text-sm text-muted-foreground">Not enough players with your position yet.</p>
                 </div>
               )}
             </motion.div>
+
+            {/* 8. RAW GPS DATA EXTRACTED */}
+            {report.raw_extracted_data && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.8 }}
+              >
+                <Collapsible open={showRawData} onOpenChange={setShowRawData}>
+                  <CollapsibleTrigger className="w-full rounded-xl border border-border/50 bg-card p-4 flex items-center justify-between hover:bg-secondary/50 transition-colors">
+                    <div className="flex items-center gap-2">
+                      <span>📊</span>
+                      <h3 className="text-sm font-semibold text-foreground">Raw GPS Data Extracted</h3>
+                    </div>
+                    <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform", showRawData && "rotate-180")} />
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <div className="rounded-xl border border-border/50 border-t-0 rounded-t-none bg-card p-4 space-y-3">
+                      {report.raw_extracted_data.player_name_found && (
+                        <p className="text-xs text-muted-foreground">
+                          Player matched: <span className="text-foreground font-medium">{report.raw_extracted_data.player_name_found}</span>
+                        </p>
+                      )}
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
+                        {report.raw_extracted_data.duration_raw != null && (
+                          <div>
+                            <p className="text-[11px] text-muted-foreground">Duration</p>
+                            <p className="font-medium text-foreground">{report.raw_extracted_data.duration_raw} ({report.raw_extracted_data.duration_minutes?.toFixed(1)} min)</p>
+                          </div>
+                        )}
+                        {report.raw_extracted_data.distance_km != null && (
+                          <div>
+                            <p className="text-[11px] text-muted-foreground">Distance</p>
+                            <p className="font-medium text-foreground">{report.raw_extracted_data.distance_km?.toFixed(2)} km ({report.raw_extracted_data.distance_meters?.toFixed(0)} m)</p>
+                          </div>
+                        )}
+                        {report.raw_extracted_data.top_speed_kmh != null && (
+                          <div>
+                            <p className="text-[11px] text-muted-foreground">Top Speed</p>
+                            <p className="font-medium text-foreground">{report.raw_extracted_data.top_speed_kmh} km/h</p>
+                          </div>
+                        )}
+                        {report.raw_extracted_data.hsr_meters != null && (
+                          <div>
+                            <p className="text-[11px] text-muted-foreground">HSR (Z4+)</p>
+                            <p className="font-medium text-foreground">{report.raw_extracted_data.hsr_meters?.toFixed(1)} m</p>
+                          </div>
+                        )}
+                        {report.raw_extracted_data.sprint_distance_meters != null && (
+                          <div>
+                            <p className="text-[11px] text-muted-foreground">Sprint Distance (Z5)</p>
+                            <p className="font-medium text-foreground">{report.raw_extracted_data.sprint_distance_meters?.toFixed(1)} m</p>
+                          </div>
+                        )}
+                        {report.raw_extracted_data.accelerations != null && (
+                          <div>
+                            <p className="text-[11px] text-muted-foreground">Accelerations</p>
+                            <p className="font-medium text-foreground">{report.raw_extracted_data.accelerations}</p>
+                          </div>
+                        )}
+                        {report.raw_extracted_data.decelerations != null && (
+                          <div>
+                            <p className="text-[11px] text-muted-foreground">Decelerations</p>
+                            <p className="font-medium text-foreground">{report.raw_extracted_data.decelerations}</p>
+                          </div>
+                        )}
+                        {report.raw_extracted_data.avg_speed_kmh != null && (
+                          <div>
+                            <p className="text-[11px] text-muted-foreground">Avg Speed</p>
+                            <p className="font-medium text-foreground">{report.raw_extracted_data.avg_speed_kmh} km/h</p>
+                          </div>
+                        )}
+                        {report.raw_extracted_data.sprint_events != null && (
+                          <div>
+                            <p className="text-[11px] text-muted-foreground">Sprint Events</p>
+                            <p className="font-medium text-foreground">{report.raw_extracted_data.sprint_events}</p>
+                          </div>
+                        )}
+                        {report.raw_extracted_data.hmld_meters != null && (
+                          <div>
+                            <p className="text-[11px] text-muted-foreground">HMLD</p>
+                            <p className="font-medium text-foreground">{report.raw_extracted_data.hmld_meters?.toFixed(1)} m</p>
+                          </div>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-muted-foreground/70 mt-2">
+                        Something doesn't look right? Make sure your name on Campometric matches your name in your team's GPS system. Contact campometric@gmail.com for help.
+                      </p>
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
+              </motion.div>
+            )}
 
             {/* 9. MOTIVATIONAL CLOSE */}
             <motion.div
@@ -788,7 +1028,6 @@ const Report = () => {
           )}
         </div>
 
-        {/* Powered by badge */}
         <p className="text-center text-[10px] text-muted-foreground/50 pb-4">
           Powered by Campometric AI
         </p>
@@ -800,13 +1039,18 @@ const Report = () => {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete this report?</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete this report? This action cannot be undone.
+              Are you sure you want to delete this report? This action cannot be undone. Your leaderboard stats will be recalculated.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteReport} className="bg-red-500 hover:bg-red-600" disabled={deleting}>
-              {deleting ? "Deleting..." : "Delete"}
+            <AlertDialogAction
+              onClick={handleDeleteReport}
+              className="bg-red-600 hover:bg-red-700"
+              disabled={deleting}
+            >
+              {deleting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Trash2 className="h-4 w-4 mr-2" />}
+              Delete
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
