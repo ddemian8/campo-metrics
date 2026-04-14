@@ -29,7 +29,7 @@ const BrowsePlayers = () => {
       // Only fetch players with PDF sessions
       const { data: statsData } = await supabase
         .from("player_stats_aggregate")
-        .select("player_id, best_top_speed, avg_distance_per90, avg_performance_score, pdf_session_count")
+        .select("player_id, best_top_speed, best_distance_single_match, best_performance_score, avg_performance_score, avg_distance_per90, pdf_session_count")
         .gt("pdf_session_count", 0)
         .order("best_top_speed", { ascending: false })
         .limit(20);
@@ -48,7 +48,7 @@ const BrowsePlayers = () => {
 
       const mapEntries = (
         data: typeof statsData,
-        key: "best_top_speed" | "avg_distance_per90" | "avg_performance_score"
+        key: "best_top_speed" | "best_distance_single_match" | "best_performance_score"
       ): LeaderboardEntry[] =>
         data
           .filter((s) => profileMap.has(s.player_id) && s[key] != null)
@@ -69,8 +69,8 @@ const BrowsePlayers = () => {
           });
 
       setFastest(mapEntries(statsData, "best_top_speed"));
-      setMostDistance(mapEntries(statsData, "avg_distance_per90"));
-      setHighestCpi(mapEntries(statsData, "avg_performance_score"));
+      setMostDistance(mapEntries(statsData, "best_distance_single_match"));
+      setHighestCpi(mapEntries(statsData, "best_performance_score"));
     };
 
     fetchLeaderboards();

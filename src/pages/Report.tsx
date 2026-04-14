@@ -223,7 +223,7 @@ async function recalculatePlayerStats(playerId: string) {
 
     const avgDistance = getAvg(pdfList, "distance");
     const avgSprintDist = getAvg(pdfList, "dist_sp_z5");
-    const avgHsr = getAvg(pdfList, "hmld");
+    const avgHsr = getAvg(pdfList, "dist_sp_z4plus");
     const avgTopSpeed = getAvg(pdfList, "max_sp");
     const avgAccel = getAvg(pdfList, "acc_ev");
     const avgDecel = getAvg(pdfList, "dec_ev");
