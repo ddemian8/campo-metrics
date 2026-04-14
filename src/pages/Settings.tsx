@@ -30,10 +30,10 @@ const SubscriptionSection = ({ profile }: { profile: any }) => {
         </div>
         <div className="flex gap-2">
           <Button size="sm" className="bg-[#1D9E75] hover:bg-[#178a64] text-white" onClick={() => openCheckout("pro")}>
-            <Crown size={14} className="mr-1" /> Upgrade to Pro — €9/mo
+            <Crown size={14} className="mr-1" /> Upgrade to Pro — €9/mo + tax
           </Button>
           <Button size="sm" variant="outline" onClick={() => openCheckout("club")}>
-            Club — €59/mo
+            Club — €59/mo + tax
           </Button>
         </div>
       </div>

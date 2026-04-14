@@ -210,7 +210,7 @@ const Dashboard = () => {
                   3 of 3 reports used this month. Resets on {resetDateStr}.
                 </p>
                 <p className="text-xs text-muted-foreground mb-3">
-                  Want unlimited reports + Pro badge? Upgrade to Pro — €9/month
+                  Want unlimited reports + Pro badge? Upgrade to Pro — €9/month (+ tax)
                 </p>
                 <Button
                   onClick={() => openCheckout("pro")}
