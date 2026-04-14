@@ -46,6 +46,7 @@ const Dashboard = () => {
   const [deleteReportId, setDeleteReportId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [paymentBanner, setPaymentBanner] = useState<string | null>(null);
+  const { openCheckout } = usePaddle();
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -212,7 +213,7 @@ const Dashboard = () => {
                   Want unlimited reports + Pro badge? Upgrade to Pro — €9/month
                 </p>
                 <Button
-                  onClick={() => navigate("/#pricing")}
+                  onClick={() => openCheckout("pro")}
                   className="bg-[#1D9E75] hover:bg-[#178a64] text-white font-semibold h-9 px-5 text-sm"
                 >
                   Upgrade to Pro →
