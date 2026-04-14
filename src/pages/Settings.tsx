@@ -7,9 +7,75 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { toast } from "sonner";
-import { Loader2, Camera, Check, X, ArrowLeft } from "lucide-react";
+import { Loader2, Camera, Check, X, ArrowLeft, Crown, CreditCard, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 import FootballDropdowns from "@/components/FootballDropdowns";
+import { usePaddle } from "@/hooks/usePaddle";
+
+const SubscriptionSection = ({ profile }: { profile: any }) => {
+  const navigate = useNavigate();
+  const { openCheckout } = usePaddle();
+  const plan = profile?.subscription_plan || "free";
+  const status = profile?.subscription_status || "none";
+  const isPaid = plan !== "free";
+  const periodEnd = profile?.subscription_current_period_end;
+  const cancelAt = profile?.subscription_cancel_at;
+
+  if (!isPaid) {
+    return (
+      <div className="space-y-3">
+        <div>
+          <p className="text-sm font-medium text-foreground">Current Plan</p>
+          <p className="text-xs text-muted-foreground">Free — 3 reports/month</p>
+        </div>
+        <div className="flex gap-2">
+          <Button size="sm" className="bg-[#1D9E75] hover:bg-[#178a64] text-white" onClick={() => openCheckout("pro")}>
+            <Crown size={14} className="mr-1" /> Upgrade to Pro — €9/mo
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => openCheckout("club")}>
+            Club — €59/mo
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  const planLabel = plan === "player_pro" ? "Player Pro" : plan === "club" ? "Club" : plan;
+  const periodEndStr = periodEnd ? new Date(periodEnd).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }) : null;
+  const cancelAtStr = cancelAt ? new Date(cancelAt).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }) : null;
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <div>
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-medium text-foreground">{planLabel}</p>
+            <span className={cn(
+              "text-[10px] px-2 py-0.5 rounded-full font-medium",
+              status === "active" ? "bg-green-500/20 text-green-400" :
+              status === "canceled" ? "bg-amber-500/20 text-amber-400" :
+              status === "past_due" ? "bg-red-500/20 text-red-400" :
+              "bg-muted text-muted-foreground"
+            )}>
+              {status === "active" ? "Active" : status === "canceled" ? "Canceled" : status === "past_due" ? "Past Due" : status}
+            </span>
+          </div>
+          {periodEndStr && status === "active" && (
+            <p className="text-xs text-muted-foreground">Next billing: {periodEndStr}</p>
+          )}
+          {status === "canceled" && cancelAtStr && (
+            <p className="text-xs text-amber-400">Access until {cancelAtStr}</p>
+          )}
+        </div>
+      </div>
+      {status === "canceled" && (
+        <Button size="sm" className="bg-[#1D9E75] hover:bg-[#178a64] text-white" onClick={() => openCheckout(plan === "club" ? "club" : "pro")}>
+          Resubscribe
+        </Button>
+      )}
+    </div>
+  );
+};
 
 const POSITION_ZONES = [
   { zone: "GK", label: "Goalkeeper", positions: ["GK"] },
@@ -387,17 +453,7 @@ const Settings = () => {
                 Change password
               </Button>
             </div>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-foreground">Current Plan</p>
-                <p className="text-xs text-muted-foreground capitalize">
-                  {profile?.subscription_plan === "free" ? "Free" : profile?.subscription_plan || "Free"}
-                </p>
-              </div>
-              <Button variant="outline" size="sm" onClick={() => navigate("/#pricing")}>
-                View plans
-              </Button>
-            </div>
+            <SubscriptionSection profile={profile} />
             <button
               onClick={() => setShowDeleteModal(true)}
               className="text-sm text-red-400 hover:text-red-300 text-left mt-4 transition-colors"
