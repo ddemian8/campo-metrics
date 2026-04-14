@@ -82,9 +82,18 @@ const Dashboard = () => {
       }
 
       setLoading(false);
+
+      // Check payment success
+      const paymentStatus = searchParams.get("payment");
+      const planParam = searchParams.get("plan");
+      if (paymentStatus === "success") {
+        setPaymentBanner(planParam === "club" ? "Club" : "Player Pro");
+        setSearchParams({}, { replace: true });
+        setTimeout(() => setPaymentBanner(null), 10000);
+      }
     };
     checkAuth();
-  }, [navigate]);
+  }, [navigate, searchParams, setSearchParams]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
