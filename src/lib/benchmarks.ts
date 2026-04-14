@@ -1,4 +1,4 @@
-// Position-based GPS benchmarks for semi-professional level
+// Position-based GPS benchmarks for ELITE professional level
 // Used for metric comparison on report pages
 
 export interface PositionBenchmark {
@@ -8,34 +8,37 @@ export interface PositionBenchmark {
   topSpeed: number;    // km/h
   accelerations: number; // /90
   decelerations: number; // /90
+  hmld: number;        // m/90
 }
 
 export const BENCHMARKS: Record<string, PositionBenchmark> = {
   // Goalkeepers
-  GK: { distance: 5.5, hsr: 120, sprintDist: 50, topSpeed: 24.0, accelerations: 20, decelerations: 18 },
-  // Defenders
-  CB: { distance: 9.8, hsr: 520, sprintDist: 180, topSpeed: 30.5, accelerations: 45, decelerations: 42 },
-  RB: { distance: 9.8, hsr: 520, sprintDist: 180, topSpeed: 30.5, accelerations: 45, decelerations: 42 },
-  LB: { distance: 9.8, hsr: 520, sprintDist: 180, topSpeed: 30.5, accelerations: 45, decelerations: 42 },
-  RWB: { distance: 9.8, hsr: 520, sprintDist: 180, topSpeed: 30.5, accelerations: 45, decelerations: 42 },
-  LWB: { distance: 9.8, hsr: 520, sprintDist: 180, topSpeed: 30.5, accelerations: 45, decelerations: 42 },
-  // Midfielders
-  CDM: { distance: 10.5, hsr: 620, sprintDist: 210, topSpeed: 30.0, accelerations: 52, decelerations: 48 },
-  CM: { distance: 10.5, hsr: 620, sprintDist: 210, topSpeed: 30.0, accelerations: 52, decelerations: 48 },
-  CAM: { distance: 10.5, hsr: 620, sprintDist: 210, topSpeed: 30.0, accelerations: 52, decelerations: 48 },
-  RM: { distance: 10.5, hsr: 620, sprintDist: 210, topSpeed: 30.0, accelerations: 52, decelerations: 48 },
-  LM: { distance: 10.5, hsr: 620, sprintDist: 210, topSpeed: 30.0, accelerations: 52, decelerations: 48 },
+  GK: { distance: 6.0, hsr: 150, sprintDist: 60, topSpeed: 28.0, accelerations: 28, decelerations: 25, hmld: 400 },
+  // Centre Backs
+  CB: { distance: 10.0, hsr: 735, sprintDist: 220, topSpeed: 33.0, accelerations: 55, decelerations: 50, hmld: 950 },
+  // Full Backs / Wing Backs
+  RB: { distance: 11.0, hsr: 1050, sprintDist: 350, topSpeed: 34.0, accelerations: 62, decelerations: 58, hmld: 1250 },
+  LB: { distance: 11.0, hsr: 1050, sprintDist: 350, topSpeed: 34.0, accelerations: 62, decelerations: 58, hmld: 1250 },
+  RWB: { distance: 11.0, hsr: 1050, sprintDist: 350, topSpeed: 34.0, accelerations: 62, decelerations: 58, hmld: 1250 },
+  LWB: { distance: 11.0, hsr: 1050, sprintDist: 350, topSpeed: 34.0, accelerations: 62, decelerations: 58, hmld: 1250 },
+  // Central Midfielders
+  CDM: { distance: 11.5, hsr: 850, sprintDist: 280, topSpeed: 33.0, accelerations: 65, decelerations: 60, hmld: 1150 },
+  CM: { distance: 11.5, hsr: 850, sprintDist: 280, topSpeed: 33.0, accelerations: 65, decelerations: 60, hmld: 1150 },
+  CAM: { distance: 11.5, hsr: 850, sprintDist: 280, topSpeed: 33.0, accelerations: 65, decelerations: 60, hmld: 1150 },
+  // Wingers / Wide Midfielders
+  RM: { distance: 10.8, hsr: 1100, sprintDist: 400, topSpeed: 35.0, accelerations: 58, decelerations: 55, hmld: 1350 },
+  LM: { distance: 10.8, hsr: 1100, sprintDist: 400, topSpeed: 35.0, accelerations: 58, decelerations: 55, hmld: 1350 },
+  RW: { distance: 10.8, hsr: 1100, sprintDist: 400, topSpeed: 35.0, accelerations: 58, decelerations: 55, hmld: 1350 },
+  LW: { distance: 10.8, hsr: 1100, sprintDist: 400, topSpeed: 35.0, accelerations: 58, decelerations: 55, hmld: 1350 },
   // Forwards
-  ST: { distance: 9.5, hsr: 680, sprintDist: 280, topSpeed: 31.5, accelerations: 48, decelerations: 44 },
-  CF: { distance: 9.5, hsr: 680, sprintDist: 280, topSpeed: 31.5, accelerations: 48, decelerations: 44 },
-  SS: { distance: 9.5, hsr: 680, sprintDist: 280, topSpeed: 31.5, accelerations: 48, decelerations: 44 },
-  RW: { distance: 9.5, hsr: 680, sprintDist: 280, topSpeed: 31.5, accelerations: 48, decelerations: 44 },
-  LW: { distance: 9.5, hsr: 680, sprintDist: 280, topSpeed: 31.5, accelerations: 48, decelerations: 44 },
+  ST: { distance: 10.2, hsr: 1050, sprintDist: 380, topSpeed: 35.5, accelerations: 55, decelerations: 52, hmld: 1250 },
+  CF: { distance: 10.2, hsr: 1050, sprintDist: 380, topSpeed: 35.5, accelerations: 55, decelerations: 52, hmld: 1250 },
+  SS: { distance: 10.2, hsr: 1050, sprintDist: 380, topSpeed: 35.5, accelerations: 55, decelerations: 52, hmld: 1250 },
 };
 
 // Fallback for unknown positions
 const DEFAULT_BENCHMARK: PositionBenchmark = {
-  distance: 9.8, hsr: 520, sprintDist: 210, topSpeed: 30.0, accelerations: 45, decelerations: 42,
+  distance: 10.5, hsr: 850, sprintDist: 280, topSpeed: 33.0, accelerations: 55, decelerations: 50, hmld: 1100,
 };
 
 export function getBenchmark(position?: string | null): PositionBenchmark {
@@ -43,27 +46,28 @@ export function getBenchmark(position?: string | null): PositionBenchmark {
   return BENCHMARKS[position.toUpperCase()] || DEFAULT_BENCHMARK;
 }
 
-// CPI thresholds per position zone for "How good am I" display
-export const CPI_THRESHOLDS: Record<string, { elite: number; excellent: number; good: number; average: number }> = {
-  GK: { elite: 85, excellent: 70, good: 55, average: 40 },
-  CB: { elite: 88, excellent: 73, good: 58, average: 43 },
-  RB: { elite: 88, excellent: 73, good: 58, average: 43 },
-  LB: { elite: 88, excellent: 73, good: 58, average: 43 },
-  RWB: { elite: 88, excellent: 73, good: 58, average: 43 },
-  LWB: { elite: 88, excellent: 73, good: 58, average: 43 },
-  CDM: { elite: 86, excellent: 72, good: 57, average: 42 },
-  CM: { elite: 86, excellent: 72, good: 57, average: 42 },
-  CAM: { elite: 86, excellent: 72, good: 57, average: 42 },
-  RM: { elite: 87, excellent: 74, good: 59, average: 44 },
-  LM: { elite: 87, excellent: 74, good: 59, average: 44 },
-  ST: { elite: 85, excellent: 71, good: 56, average: 41 },
-  CF: { elite: 85, excellent: 71, good: 56, average: 41 },
-  SS: { elite: 85, excellent: 71, good: 56, average: 41 },
-  RW: { elite: 87, excellent: 74, good: 59, average: 44 },
-  LW: { elite: 87, excellent: 74, good: 59, average: 44 },
-};
+// Rating system: compare player's per-90 value against elite benchmark
+// ≥100% of elite → "Elite"
+// 75-99% of elite → "Excellent"
+// 50-74% of elite → "Good"
+// 35-49% of elite → "Average"
+// <35% of elite → "Developing"
+export function getMetricRating(playerValue: number, eliteBenchmark: number): string {
+  if (eliteBenchmark <= 0) return "average";
+  const pct = (playerValue / eliteBenchmark) * 100;
+  if (pct >= 100) return "elite";
+  if (pct >= 75) return "excellent";
+  if (pct >= 50) return "good";
+  if (pct >= 35) return "average";
+  return "developing";
+}
 
-export type RatingLevel = "elite" | "above_average" | "average" | "below_average" | "needs_improvement";
+export function getElitePercentage(playerValue: number, eliteBenchmark: number): number {
+  if (eliteBenchmark <= 0) return 0;
+  return Math.min(150, Math.max(0, (playerValue / eliteBenchmark) * 100));
+}
+
+export type RatingLevel = "elite" | "excellent" | "good" | "average" | "developing";
 
 export interface RatingConfig {
   label: string;
@@ -77,8 +81,7 @@ export const CPI_RATING_MAP: Record<string, RatingConfig> = {
   excellent: { label: "EXCELLENT", color: "text-white", bg: "bg-[#1D9E75]", description: "You're among the best performers at your level" },
   good: { label: "GOOD", color: "text-white", bg: "bg-primary", description: "Strong performance with room to reach the next level" },
   average: { label: "AVERAGE", color: "text-yellow-900", bg: "bg-yellow-400", description: "Solid foundation — focus on key areas to improve" },
-  below_average: { label: "BELOW AVERAGE", color: "text-white", bg: "bg-orange-500", description: "Keep pushing — targeted training will help you improve" },
-  needs_work: { label: "NEEDS WORK", color: "text-white", bg: "bg-red-500", description: "Every champion starts somewhere — let's build your game" },
+  developing: { label: "DEVELOPING", color: "text-white", bg: "bg-orange-500", description: "Keep pushing — targeted training will help you improve" },
 };
 
 export function getCpiRatingKey(score: number): string {
@@ -86,8 +89,7 @@ export function getCpiRatingKey(score: number): string {
   if (score >= 75) return "excellent";
   if (score >= 60) return "good";
   if (score >= 45) return "average";
-  if (score >= 30) return "below_average";
-  return "needs_work";
+  return "developing";
 }
 
 export const METRIC_EXPLANATIONS: Record<string, { icon: string; description: string }> = {
