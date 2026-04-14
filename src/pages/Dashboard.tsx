@@ -19,6 +19,7 @@ import logo from "@/assets/logo.svg";
 import { cn } from "@/lib/utils";
 import { DataSourceBadge } from "@/components/DataSourceBadge";
 import AffiliateDashboardSection from "@/components/AffiliateDashboardSection";
+import { usePaddle } from "@/hooks/usePaddle";
 
 interface ReportRow {
   id: string;
