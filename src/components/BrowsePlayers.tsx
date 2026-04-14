@@ -48,7 +48,7 @@ const BrowsePlayers = () => {
 
       const mapEntries = (
         data: typeof statsData,
-        key: "best_top_speed" | "avg_distance_per90" | "avg_performance_score"
+        key: "best_top_speed" | "best_distance_single_match" | "best_performance_score"
       ): LeaderboardEntry[] =>
         data
           .filter((s) => profileMap.has(s.player_id) && s[key] != null)
@@ -69,8 +69,8 @@ const BrowsePlayers = () => {
           });
 
       setFastest(mapEntries(statsData, "best_top_speed"));
-      setMostDistance(mapEntries(statsData, "avg_distance_per90"));
-      setHighestCpi(mapEntries(statsData, "avg_performance_score"));
+      setMostDistance(mapEntries(statsData, "best_distance_single_match"));
+      setHighestCpi(mapEntries(statsData, "best_performance_score"));
     };
 
     fetchLeaderboards();
