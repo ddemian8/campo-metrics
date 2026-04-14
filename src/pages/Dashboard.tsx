@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Loader2, Plus, LogOut, ChevronRight, Crown, Settings, Trash2 } from "lucide-react";
+import { Loader2, Plus, LogOut, ChevronRight, Crown, Settings, Trash2, PartyPopper } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -37,12 +37,14 @@ interface ReportRow {
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<any>(null);
   const [reports, setReports] = useState<ReportRow[]>([]);
   const [hasAffiliate, setHasAffiliate] = useState(false);
   const [deleteReportId, setDeleteReportId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [paymentBanner, setPaymentBanner] = useState<string | null>(null);
 
   useEffect(() => {
     const checkAuth = async () => {
