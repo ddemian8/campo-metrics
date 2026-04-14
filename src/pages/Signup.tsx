@@ -202,9 +202,9 @@ const Signup = () => {
             By creating an account, your name, position, and GPS performance stats will be visible on the Campometric leaderboard and player directory. This helps scouts and clubs discover you.
           </p>
           <p className="text-xs text-muted-foreground text-center mt-2">
-            You agree to our{" "}
-            <a href="/terms" className="underline hover:text-foreground">Terms of Service</a> and{" "}
-            <a href="/privacy" className="underline hover:text-foreground">Privacy Policy</a>.
+            By creating an account, you agree to our{" "}
+            <Link to="/terms" className="underline hover:text-foreground">Terms of Service</Link> and{" "}
+            <Link to="/privacy" className="underline hover:text-foreground">Privacy Policy</Link>.
           </p>
 
           <div className="relative my-6">

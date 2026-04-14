@@ -153,7 +153,7 @@ const Pricing = () => (
 
       <AnimateIn delay={0.3}>
         <p className="text-center text-[12px] text-muted-foreground mt-10">
-          All plans include HTTPS encryption, GDPR compliance, and data that
+          7-day money-back guarantee on all paid plans. All plans include HTTPS encryption, GDPR compliance, and data that
           belongs to you. Cancel anytime.
         </p>
       </AnimateIn>

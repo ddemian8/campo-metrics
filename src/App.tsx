@@ -14,6 +14,9 @@ import Settings from "./pages/Settings.tsx";
 import PlayerProfile from "./pages/PlayerProfile.tsx";
 import ResetPassword from "./pages/ResetPassword.tsx";
 import Affiliate from "./pages/Affiliate.tsx";
+import Terms from "./pages/Terms.tsx";
+import Privacy from "./pages/Privacy.tsx";
+import Refund from "./pages/Refund.tsx";
 import AdminDashboard from "./pages/admin/AdminDashboard.tsx";
 import AdminUsers from "./pages/admin/AdminUsers.tsx";
 import AdminReports from "./pages/admin/AdminReports.tsx";
@@ -46,6 +49,9 @@ const App = () => (
           <Route path="/player/:username" element={<PlayerProfile />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/affiliate" element={<Affiliate />} />
+          <Route path="/terms" element={<Terms />} />
+          <Route path="/privacy" element={<Privacy />} />
+          <Route path="/refund" element={<Refund />} />
           <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/admin/users" element={<AdminUsers />} />
           <Route path="/admin/reports" element={<AdminReports />} />
