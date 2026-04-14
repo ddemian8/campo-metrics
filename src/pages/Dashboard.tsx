@@ -167,6 +167,22 @@ const Dashboard = () => {
         </h1>
         <p className="text-muted-foreground mb-8">Your performance dashboard</p>
 
+        {/* Payment success banner */}
+        {paymentBanner && (
+          <div className="rounded-xl border border-[#1D9E75]/30 bg-[#1D9E75]/10 p-5 mb-8 flex items-center gap-3">
+            <PartyPopper className="h-6 w-6 text-[#1D9E75] shrink-0" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-foreground">
+                🎉 Welcome to {paymentBanner}! Your subscription is now active.
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Enjoy unlimited reports and all premium features.
+              </p>
+            </div>
+            <button onClick={() => setPaymentBanner(null)} className="text-muted-foreground hover:text-foreground text-sm">✕</button>
+          </div>
+        )}
+
         {/* Stats cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           {[
