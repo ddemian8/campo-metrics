@@ -242,39 +242,17 @@ const ClubSignup = () => {
                 </Select>
               </div>
 
-              {!manualMode ? (
-                <>
-                  <FootballDropdowns
-                    countryId={countryId}
-                    leagueId={leagueId}
-                    teamId={teamId}
-                    onCountryChange={(id, name) => { setCountryId(id); setCountryName(name || ""); }}
-                    onLeagueChange={(id, name) => { setLeagueId(id); setLeagueName(name || ""); }}
-                    onTeamChange={(id, name) => { setTeamId(id); setTeamName(name || ""); }}
-                  />
-                  <button type="button" onClick={() => setManualMode(true)} className="text-xs text-primary hover:underline">
-                    Can't find your club? Enter manually
-                  </button>
-                </>
-              ) : (
-                <>
-                  <div>
-                    <Label>Country</Label>
-                    <Input value={countryName} onChange={(e) => setCountryName(e.target.value)} placeholder="Moldova" />
-                  </div>
-                  <div>
-                    <Label>League</Label>
-                    <Input value={leagueName} onChange={(e) => setLeagueName(e.target.value)} placeholder="Super Liga" />
-                  </div>
-                  <div>
-                    <Label>Team</Label>
-                    <Input value={teamName} onChange={(e) => setTeamName(e.target.value)} placeholder="FC Petrocub" />
-                  </div>
-                  <button type="button" onClick={() => setManualMode(false)} className="text-xs text-primary hover:underline">
-                    Use the dropdowns instead
-                  </button>
-                </>
-              )}
+              <FootballDropdowns
+                countryId={countryId}
+                leagueId={leagueId}
+                teamId={teamId}
+                countryName={countryName}
+                leagueName={leagueName}
+                teamName={teamName}
+                onCountryChange={(id, name) => { setCountryId(id); setCountryName(name || ""); }}
+                onLeagueChange={(id, name) => { setLeagueId(id); setLeagueName(name || ""); }}
+                onTeamChange={(id, name) => { setTeamId(id); setTeamName(name || ""); }}
+              />
 
               <div className="flex gap-3 pt-2">
                 <Button type="button" variant="outline" onClick={() => setStep(1)}>Back</Button>

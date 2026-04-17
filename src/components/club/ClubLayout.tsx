@@ -30,9 +30,9 @@ const ClubLayout = ({ children }: Props) => {
       <ClubSidebar clubName={club.name} clubLogo={club.logo_url} />
       <main className="flex-1 min-w-0">
         {showTrialBanner && (
-          <div className="border-b border-amber-500/20 bg-amber-500/10 px-6 py-3 flex items-center justify-between gap-4">
-            <div className="flex items-center gap-2 text-sm text-amber-200">
-              <AlertCircle size={16} />
+          <div className="border-b border-primary/20 bg-primary/10 px-6 py-3 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-2 text-sm text-foreground">
+              <AlertCircle size={16} className="text-primary" />
               <span>
                 <strong>{trialDays} days</strong> remaining in your free trial. After that, €69/month for up to 25 players.
               </span>
