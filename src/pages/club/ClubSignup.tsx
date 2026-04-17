@@ -69,8 +69,9 @@ const ClubSignup = () => {
 
   const handleStep2 = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!clubName.trim()) {
-      toast.error("Club name is required.");
+    const finalClubName = clubName.trim() || teamName.trim();
+    if (!finalClubName) {
+      toast.error("Please select your team (or enter it manually).");
       return;
     }
     setSubmitting(true);
@@ -108,12 +109,12 @@ const ClubSignup = () => {
         .eq("id", profileId);
 
       // Create the club
-      const baseSlug = slugify(clubName);
+      const baseSlug = slugify(finalClubName);
       const slug = `${baseSlug}-${Math.random().toString(36).slice(2, 6)}`;
       const trialEnds = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
 
       const { error: clubErr } = await supabase.from("clubs").insert({
-        name: clubName,
+        name: finalClubName,
         slug,
         sport,
         admin_id: profileId,
@@ -216,11 +217,6 @@ const ClubSignup = () => {
             <p className="text-sm text-muted-foreground mb-6">Tell us where your team plays.</p>
             <form onSubmit={handleStep2} className="space-y-4">
               <div>
-                <Label htmlFor="clubName">Club name</Label>
-                <Input id="clubName" value={clubName} onChange={(e) => setClubName(e.target.value)} placeholder="FC Petrocub Hîncești" required />
-              </div>
-
-              <div>
                 <Label>Sport</Label>
                 <Select value={sport} onValueChange={setSport}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
@@ -250,7 +246,11 @@ const ClubSignup = () => {
                 teamName={teamName}
                 onCountryChange={(id, name) => { setCountryId(id); setCountryName(name || ""); }}
                 onLeagueChange={(id, name) => { setLeagueId(id); setLeagueName(name || ""); }}
-                onTeamChange={(id, name) => { setTeamId(id); setTeamName(name || ""); }}
+                onTeamChange={(id, name) => {
+                  setTeamId(id);
+                  setTeamName(name || "");
+                  if (name && !clubName) setClubName(name);
+                }}
               />
 
               <div className="flex gap-3 pt-2">
