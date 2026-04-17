@@ -216,11 +216,6 @@ const ClubSignup = () => {
             <p className="text-sm text-muted-foreground mb-6">Tell us where your team plays.</p>
             <form onSubmit={handleStep2} className="space-y-4">
               <div>
-                <Label htmlFor="clubName">Club name</Label>
-                <Input id="clubName" value={clubName} onChange={(e) => setClubName(e.target.value)} placeholder="FC Petrocub Hîncești" required />
-              </div>
-
-              <div>
                 <Label>Sport</Label>
                 <Select value={sport} onValueChange={setSport}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
@@ -250,7 +245,11 @@ const ClubSignup = () => {
                 teamName={teamName}
                 onCountryChange={(id, name) => { setCountryId(id); setCountryName(name || ""); }}
                 onLeagueChange={(id, name) => { setLeagueId(id); setLeagueName(name || ""); }}
-                onTeamChange={(id, name) => { setTeamId(id); setTeamName(name || ""); }}
+                onTeamChange={(id, name) => {
+                  setTeamId(id);
+                  setTeamName(name || "");
+                  if (name && !clubName) setClubName(name);
+                }}
               />
 
               <div className="flex gap-3 pt-2">
