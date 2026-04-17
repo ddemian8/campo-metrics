@@ -69,8 +69,9 @@ const ClubSignup = () => {
 
   const handleStep2 = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!clubName.trim()) {
-      toast.error("Club name is required.");
+    const finalClubName = clubName.trim() || teamName.trim();
+    if (!finalClubName) {
+      toast.error("Please select your team (or enter it manually).");
       return;
     }
     setSubmitting(true);
