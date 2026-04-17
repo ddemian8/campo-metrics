@@ -65,11 +65,11 @@ const Pricing = () => {
     },
     {
       name: "Club",
-      price: "€59",
+      price: "€69",
       period: "/ month",
-      badge: "Full access · Teams & analysts",
-      cta: "Get Club Plan →",
-      onClick: () => openCheckout("club"),
+      badge: "First 30 days free",
+      cta: "Start free trial →",
+      onClick: () => navigate("/club/signup"),
       popular: false,
       features: [
         "25 players included, all with Pro features",

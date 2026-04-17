@@ -194,8 +194,8 @@ const ClubUpload = () => {
         competition: sessionType === "match" ? competition : null,
         pdf_url: pdfUrl,
         players_detected: matched.length,
-        raw_pdf_data: { players: detected, opponent, competition },
-      }).select("id").single();
+        raw_pdf_data: { players: detected, opponent, competition } as any,
+      } as any).select("id").single();
       if (sessErr) throw sessErr;
       setSessionId(sess.id);
 

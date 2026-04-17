@@ -19,6 +19,27 @@ const Login = () => {
   const [resetSent, setResetSent] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
 
+  const routeAfterLogin = async (userId: string) => {
+    const { data: prof } = await supabase
+      .from("profiles")
+      .select("id, account_type")
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (prof) {
+      const { data: club } = await supabase
+        .from("clubs")
+        .select("id")
+        .eq("admin_id", prof.id)
+        .limit(1)
+        .maybeSingle();
+      if (club || prof.account_type === "club_owner") {
+        navigate("/club/dashboard");
+        return;
+      }
+    }
+    navigate(redirectTo);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -28,18 +49,18 @@ const Login = () => {
     }
 
     setLoading(true);
-    const { error: authError } = await supabase.auth.signInWithPassword({
+    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
       email: email.trim(),
       password,
     });
 
-    if (authError) {
+    if (authError || !authData.user) {
       setError("Invalid email or password.");
       setLoading(false);
       return;
     }
 
-    navigate(redirectTo);
+    await routeAfterLogin(authData.user.id);
   };
 
   const handleForgotPassword = async () => {

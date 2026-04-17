@@ -8,8 +8,8 @@ import { supabase } from "@/integrations/supabase/client";
 const navLinks = [
   { label: "How it works", href: "#how-it-works" },
   { label: "Pricing", href: "#pricing" },
+  { label: "For Clubs", href: "/club/signup", isRoute: true },
   { label: "Explore", href: "/explore", isRoute: true },
-  { label: "For Clubs", href: "#pricing" },
   { label: "Affiliate", href: "/affiliate", isRoute: true },
 ];
 
