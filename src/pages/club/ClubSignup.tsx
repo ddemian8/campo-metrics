@@ -109,12 +109,12 @@ const ClubSignup = () => {
         .eq("id", profileId);
 
       // Create the club
-      const baseSlug = slugify(clubName);
+      const baseSlug = slugify(finalClubName);
       const slug = `${baseSlug}-${Math.random().toString(36).slice(2, 6)}`;
       const trialEnds = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
 
       const { error: clubErr } = await supabase.from("clubs").insert({
-        name: clubName,
+        name: finalClubName,
         slug,
         sport,
         admin_id: profileId,
