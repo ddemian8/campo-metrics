@@ -27,6 +27,13 @@ import AdminContent from "./pages/admin/AdminContent.tsx";
 import AdminLeaderboard from "./pages/admin/AdminLeaderboard.tsx";
 import AdminSettings from "./pages/admin/AdminSettings.tsx";
 import AdminFootballDatabase from "./pages/admin/AdminFootballDatabase.tsx";
+import ClubSignup from "./pages/club/ClubSignup.tsx";
+import ClubDashboard from "./pages/club/ClubDashboard.tsx";
+import ClubUpload from "./pages/club/ClubUpload.tsx";
+import ClubSessions from "./pages/club/ClubSessions.tsx";
+import ClubSessionDetail from "./pages/club/ClubSessionDetail.tsx";
+import ClubRoster from "./pages/club/ClubRoster.tsx";
+import ClubSettings from "./pages/club/ClubSettings.tsx";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
@@ -62,6 +69,13 @@ const App = () => (
           <Route path="/admin/leaderboard" element={<AdminLeaderboard />} />
           <Route path="/admin/settings" element={<AdminSettings />} />
           <Route path="/admin/football" element={<AdminFootballDatabase />} />
+          <Route path="/club/signup" element={<ClubSignup />} />
+          <Route path="/club/dashboard" element={<ClubDashboard />} />
+          <Route path="/club/dashboard/upload" element={<ClubUpload />} />
+          <Route path="/club/dashboard/sessions" element={<ClubSessions />} />
+          <Route path="/club/dashboard/sessions/:id" element={<ClubSessionDetail />} />
+          <Route path="/club/dashboard/roster" element={<ClubRoster />} />
+          <Route path="/club/dashboard/settings" element={<ClubSettings />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

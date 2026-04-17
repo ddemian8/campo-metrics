@@ -409,21 +409,208 @@ export type Database = {
           },
         ]
       }
+      club_players: {
+        Row: {
+          account_status: string
+          activated_at: string | null
+          club_id: string
+          created_at: string
+          email: string | null
+          full_name: string
+          id: string
+          invited_at: string | null
+          is_active: boolean
+          pdf_name: string
+          position: string | null
+          user_id: string | null
+        }
+        Insert: {
+          account_status?: string
+          activated_at?: string | null
+          club_id: string
+          created_at?: string
+          email?: string | null
+          full_name: string
+          id?: string
+          invited_at?: string | null
+          is_active?: boolean
+          pdf_name: string
+          position?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          account_status?: string
+          activated_at?: string | null
+          club_id?: string
+          created_at?: string
+          email?: string | null
+          full_name?: string
+          id?: string
+          invited_at?: string | null
+          is_active?: boolean
+          pdf_name?: string
+          position?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "club_players_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "club_players_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      club_reports: {
+        Row: {
+          club_id: string
+          club_player_id: string
+          club_session_id: string
+          cpi_score: number | null
+          created_at: string
+          id: string
+          raw_metrics: Json | null
+          report_data: Json | null
+        }
+        Insert: {
+          club_id: string
+          club_player_id: string
+          club_session_id: string
+          cpi_score?: number | null
+          created_at?: string
+          id?: string
+          raw_metrics?: Json | null
+          report_data?: Json | null
+        }
+        Update: {
+          club_id?: string
+          club_player_id?: string
+          club_session_id?: string
+          cpi_score?: number | null
+          created_at?: string
+          id?: string
+          raw_metrics?: Json | null
+          report_data?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "club_reports_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "club_reports_club_player_id_fkey"
+            columns: ["club_player_id"]
+            isOneToOne: false
+            referencedRelation: "club_players"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "club_reports_club_session_id_fkey"
+            columns: ["club_session_id"]
+            isOneToOne: false
+            referencedRelation: "club_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      club_sessions: {
+        Row: {
+          club_id: string
+          competition: string | null
+          created_at: string
+          id: string
+          opponent: string | null
+          pdf_url: string | null
+          players_detected: number
+          raw_pdf_data: Json | null
+          reports_generated: number
+          session_date: string
+          session_name: string
+          session_type: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          club_id: string
+          competition?: string | null
+          created_at?: string
+          id?: string
+          opponent?: string | null
+          pdf_url?: string | null
+          players_detected?: number
+          raw_pdf_data?: Json | null
+          reports_generated?: number
+          session_date?: string
+          session_name: string
+          session_type?: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          club_id?: string
+          competition?: string | null
+          created_at?: string
+          id?: string
+          opponent?: string | null
+          pdf_url?: string | null
+          players_detected?: number
+          raw_pdf_data?: Json | null
+          reports_generated?: number
+          session_date?: string
+          session_name?: string
+          session_type?: string
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "club_sessions_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "club_sessions_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clubs: {
         Row: {
           admin_id: string | null
           city: string | null
           country: string | null
+          country_id: number | null
+          country_name: string | null
           created_at: string
           id: string
           league: string | null
+          league_id: number | null
+          league_name: string | null
           logo_url: string | null
           max_players: number
           name: string
           paddle_customer_id: string | null
           paddle_subscription_id: string | null
           slug: string
+          sport: string
+          subscription_plan: string
           subscription_status: string
+          team_id: number | null
+          team_name: string | null
+          trial_ends_at: string | null
           updated_at: string
           website: string | null
         }
@@ -431,16 +618,25 @@ export type Database = {
           admin_id?: string | null
           city?: string | null
           country?: string | null
+          country_id?: number | null
+          country_name?: string | null
           created_at?: string
           id?: string
           league?: string | null
+          league_id?: number | null
+          league_name?: string | null
           logo_url?: string | null
           max_players?: number
           name: string
           paddle_customer_id?: string | null
           paddle_subscription_id?: string | null
           slug: string
+          sport?: string
+          subscription_plan?: string
           subscription_status?: string
+          team_id?: number | null
+          team_name?: string | null
+          trial_ends_at?: string | null
           updated_at?: string
           website?: string | null
         }
@@ -448,16 +644,25 @@ export type Database = {
           admin_id?: string | null
           city?: string | null
           country?: string | null
+          country_id?: number | null
+          country_name?: string | null
           created_at?: string
           id?: string
           league?: string | null
+          league_id?: number | null
+          league_name?: string | null
           logo_url?: string | null
           max_players?: number
           name?: string
           paddle_customer_id?: string | null
           paddle_subscription_id?: string | null
           slug?: string
+          sport?: string
+          subscription_plan?: string
           subscription_status?: string
+          team_id?: number | null
+          team_name?: string | null
+          trial_ends_at?: string | null
           updated_at?: string
           website?: string | null
         }
@@ -467,6 +672,27 @@ export type Database = {
             columns: ["admin_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clubs_country_id_fkey"
+            columns: ["country_id"]
+            isOneToOne: false
+            referencedRelation: "football_countries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clubs_league_id_fkey"
+            columns: ["league_id"]
+            isOneToOne: false
+            referencedRelation: "football_leagues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clubs_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "football_teams"
             referencedColumns: ["id"]
           },
         ]
