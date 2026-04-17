@@ -57,7 +57,6 @@ const ClubSignup = () => {
   const [countryName, setCountryName] = useState("");
   const [leagueName, setLeagueName] = useState("");
   const [teamName, setTeamName] = useState("");
-  const [manualMode, setManualMode] = useState(false);
 
   const handleStep1 = (e: React.FormEvent) => {
     e.preventDefault();
