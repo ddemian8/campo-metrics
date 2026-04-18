@@ -550,7 +550,7 @@ const Report = () => {
       const filename = `${dateStr}${opponentStr}_${nameStr}_Campometric.pdf`;
 
       const opt = {
-        margin: [10, 10, 15, 10],
+        margin: [10, 10, 15, 10] as [number, number, number, number],
         filename,
         image: { type: "jpeg", quality: 0.95 },
         html2canvas: { scale: 2, useCORS: true, backgroundColor: "#ffffff" },
