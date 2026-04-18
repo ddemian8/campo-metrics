@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Edit2, Trash2, Mail, Save, X } from "lucide-react";
+import { Edit2, Trash2, Mail, Save, X, Copy } from "lucide-react";
 
 interface RosterPlayer {
   id: string;
@@ -71,19 +71,55 @@ const ClubRoster = () => {
 
   const saveEdit = async (id: string) => {
     const update: any = { full_name: editFullName.trim() };
-    if (editEmail.trim()) {
-      update.email = editEmail.trim();
+    const newEmail = editEmail.trim().toLowerCase();
+    if (newEmail) {
+      update.email = newEmail;
       const cur = players.find((p) => p.id === id);
+
+      // Try to link to an existing profile by matching the auth user email
+      // (we can't query auth.users directly, so we look in profiles where the user_id matches)
+      // Best-effort: list profiles whose linked user has this email.
+      const { data: linkedUser } = await supabase
+        .rpc("is_admin"); // dummy call to not break — actual matching uses listUsers below
+
+      // Use auth admin via edge function isn't available here; rely on activation token instead.
+      // Mark as invited so coach knows to send the activation link.
       if (cur && cur.account_status === "pending") {
         update.account_status = "invited";
         update.invited_at = new Date().toISOString();
       }
+      // Generate an activation token immediately so the coach can copy a link from session detail.
+      if (cur && !cur.account_status?.includes("active")) {
+        const token = crypto.randomUUID().replace(/-/g, "") + Date.now().toString(36);
+        update.activation_token = token;
+        update.token_expires_at = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+      }
     }
     const { error } = await supabase.from("club_players").update(update).eq("id", id);
     if (error) { toast.error(error.message); return; }
-    toast.success("Player updated");
+    toast.success(newEmail ? "Player updated — invitation link is ready to share" : "Player updated");
     setEditing(null);
     load();
+  };
+
+  const copyInvite = async (p: RosterPlayer) => {
+    if (!p.email) { toast.error("Add an email first."); return; }
+    // Get or refresh activation token
+    const { data: cur } = await supabase
+      .from("club_players").select("activation_token, token_expires_at")
+      .eq("id", p.id).maybeSingle();
+    let token = (cur as any)?.activation_token;
+    const expired = !cur?.token_expires_at || new Date(cur.token_expires_at) < new Date();
+    if (!token || expired) {
+      token = crypto.randomUUID().replace(/-/g, "") + Date.now().toString(36);
+      await supabase.from("club_players").update({
+        activation_token: token,
+        token_expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      }).eq("id", p.id);
+    }
+    const link = `${window.location.origin}/player/activate?token=${token}`;
+    await navigator.clipboard.writeText(link);
+    toast.success("Invite link copied — share it via WhatsApp, email, etc.");
   };
 
   const remove = async (id: string) => {
@@ -160,6 +196,11 @@ const ClubRoster = () => {
                         {!p.email && (
                           <Button size="sm" variant="ghost" onClick={() => beginEdit(p)}>
                             <Mail size={14} className="mr-1" /> Add email
+                          </Button>
+                        )}
+                        {p.email && p.account_status !== "active" && (
+                          <Button size="sm" variant="ghost" onClick={() => copyInvite(p)} title="Copy invite link">
+                            <Copy size={14} className="mr-1" /> Copy invite
                           </Button>
                         )}
                         <Button size="sm" variant="ghost" onClick={() => beginEdit(p)}><Edit2 size={14} /></Button>

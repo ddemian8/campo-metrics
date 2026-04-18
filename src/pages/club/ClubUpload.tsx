@@ -205,42 +205,54 @@ const ClubUpload = () => {
       setProgress(initial);
       setStep("generate");
 
+      // Fetch positions for matched roster players
+      const playerIds = playersToProcess.map((p) => p.matched_id).filter(Boolean) as string[];
+      const { data: rosterPos } = await supabase
+        .from("club_players").select("id, position").in("id", playerIds);
+      const posById = new Map((rosterPos || []).map((r: any) => [r.id, r.position]));
+
       let generated = 0;
       for (let i = 0; i < playersToProcess.length; i++) {
         const p = playersToProcess[i];
         setProgress((prev) => prev.map((r, idx) => idx === i ? { ...r, status: "running" } : r));
         try {
           const minutes = p.minutes_played || 90;
-          const { data: report, error: repErr } = await supabase.functions.invoke("generate-report", {
+          const position = (p.matched_id && posById.get(p.matched_id)) || null;
+
+          const metrics = {
+            minutes_played: minutes,
+            distance_meters: p.distance,
+            dist_sp_z4plus: p.dist_sp_z4plus,
+            dist_sp_z5: p.dist_sp_z5,
+            max_sp: p.max_sp,
+            av_sp: null,
+            acc_ev: p.acc_ev,
+            dec_ev: p.dec_ev,
+            sp_ev: p.sp_ev,
+            hmld: p.hmld,
+          };
+
+          const { data: resp, error: repErr } = await supabase.functions.invoke("generate-club-report", {
             body: {
               player_name: p.pdf_name,
-              position: "Unknown",
+              position,
               session_type: sessionType,
               session_date: sessionDate,
               opponent: sessionType === "match" ? opponent : null,
               competition: sessionType === "match" ? competition : null,
-              minutes_played: minutes,
-              gps_data: {
-                distance: p.distance,
-                dist_sp_z4plus: p.dist_sp_z4plus,
-                dist_sp_z5: p.dist_sp_z5,
-                max_sp: p.max_sp,
-                acc_ev: p.acc_ev,
-                dec_ev: p.dec_ev,
-                sp_ev: p.sp_ev,
-                hmld: p.hmld,
-              },
-              input_method: "pdf_upload",
+              metrics,
             },
           });
 
           if (repErr) throw repErr;
-          const cpi = report?.ai_report?.cpi || report?.cpi || null;
+          const report = resp?.report || resp;
+          const cpi = report?.cpi ?? null;
+
           await supabase.from("club_reports").insert({
             club_session_id: sess.id,
             club_player_id: p.matched_id!,
             club_id: club.id,
-            report_data: report?.ai_report || report,
+            report_data: report,
             cpi_score: cpi,
             raw_metrics: {
               minutes_played: minutes,
@@ -252,6 +264,7 @@ const ClubUpload = () => {
               dec_ev: p.dec_ev,
               sp_ev: p.sp_ev,
               hmld: p.hmld,
+              position_used: position,
             },
           });
           generated++;
