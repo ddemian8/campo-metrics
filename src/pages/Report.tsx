@@ -347,6 +347,51 @@ const Report = () => {
 
     const fetchReport = async () => {
       try {
+        // Detect if this id is a club_report (used by club platform / player dashboard)
+        const params = new URLSearchParams(window.location.search);
+        const isClubSource = params.get("source") === "club";
+
+        let clubReportRow: any = null;
+        if (isClubSource) {
+          const { data } = await supabase
+            .from("club_reports")
+            .select("id, cpi_score, raw_metrics, report_data, club_player_id, club_session_id, club_players(full_name, position), club_sessions(session_name, session_date, session_type, opponent, competition)")
+            .eq("id", id).maybeSingle();
+          clubReportRow = data;
+        }
+
+        if (clubReportRow) {
+          const cs: any = clubReportRow.club_sessions || {};
+          const cp: any = clubReportRow.club_players || {};
+          const m: any = clubReportRow.raw_metrics || {};
+          setSession({
+            id: clubReportRow.club_session_id,
+            player_name: cp.full_name || null,
+            position: cp.position || null,
+            position_specific: cp.position || null,
+            session_type: cs.session_type,
+            training_day: null,
+            session_date: cs.session_date,
+            opponent: cs.opponent,
+            competition: cs.competition,
+            minutes_played: m.minutes_played,
+            gps_data: {
+              distance: m.distance, dist_sp_z4plus: m.dist_sp_z4plus, dist_sp_z5: m.dist_sp_z5,
+              max_sp: m.max_sp, acc_ev: m.acc_ev, dec_ev: m.dec_ev, sp_ev: m.sp_ev, hmld: m.hmld,
+            } as any,
+            player_id: clubReportRow.club_player_id,
+            input_method: "pdf_upload",
+          });
+          setReportId(clubReportRow.id);
+          if (clubReportRow.report_data) {
+            setReport(clubReportRow.report_data as unknown as ReportData);
+          } else {
+            setError("Report not yet generated.");
+          }
+          setLoading(false);
+          return;
+        }
+
         const { data: reportRow } = await supabase
           .from("reports")
           .select("*, sessions(*)")
