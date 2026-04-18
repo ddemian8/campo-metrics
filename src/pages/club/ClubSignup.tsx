@@ -89,9 +89,28 @@ const ClubSignup = () => {
       if (signUpError) throw signUpError;
       if (!signUpData.user) throw new Error("Could not create account");
 
-      // Wait briefly for the handle_new_user trigger
+      // Detect "user already registered" — Supabase returns a user with empty identities
+      const identities = (signUpData.user as any).identities;
+      if (Array.isArray(identities) && identities.length === 0) {
+        toast.error("An account with this email already exists. Please log in instead.");
+        setSubmitting(false);
+        return;
+      }
+
+      // If email confirmation is required, no session is returned. Try to sign in
+      // so that RLS-protected profile lookups work.
+      if (!signUpData.session) {
+        const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+        if (signInError) {
+          toast.error("Please confirm your email, then log back in to finish creating your club.");
+          setSubmitting(false);
+          return;
+        }
+      }
+
+      // Wait briefly for the handle_new_user trigger to insert the profile
       let profileId: string | null = null;
-      for (let i = 0; i < 10 && !profileId; i++) {
+      for (let i = 0; i < 15 && !profileId; i++) {
         await new Promise((r) => setTimeout(r, 300));
         const { data: prof } = await supabase
           .from("profiles")
