@@ -36,6 +36,18 @@ const Login = () => {
         navigate("/club/dashboard");
         return;
       }
+      // Club player → player dashboard
+      const { data: cp } = await supabase
+        .from("club_players")
+        .select("id")
+        .eq("user_id", prof.id)
+        .eq("is_active", true)
+        .limit(1)
+        .maybeSingle();
+      if (cp || prof.account_type === "club_player") {
+        navigate("/player/dashboard");
+        return;
+      }
     }
     navigate(redirectTo);
   };

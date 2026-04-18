@@ -34,6 +34,8 @@ import ClubSessions from "./pages/club/ClubSessions.tsx";
 import ClubSessionDetail from "./pages/club/ClubSessionDetail.tsx";
 import ClubRoster from "./pages/club/ClubRoster.tsx";
 import ClubSettings from "./pages/club/ClubSettings.tsx";
+import PlayerActivate from "./pages/player/PlayerActivate.tsx";
+import PlayerDashboard from "./pages/player/PlayerDashboard.tsx";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
@@ -76,6 +78,8 @@ const App = () => (
           <Route path="/club/dashboard/sessions/:id" element={<ClubSessionDetail />} />
           <Route path="/club/dashboard/roster" element={<ClubRoster />} />
           <Route path="/club/dashboard/settings" element={<ClubSettings />} />
+          <Route path="/player/activate" element={<PlayerActivate />} />
+          <Route path="/player/dashboard" element={<PlayerDashboard />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
