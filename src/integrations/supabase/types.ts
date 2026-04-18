@@ -413,6 +413,7 @@ export type Database = {
         Row: {
           account_status: string
           activated_at: string | null
+          activation_token: string | null
           club_id: string
           created_at: string
           email: string | null
@@ -422,11 +423,13 @@ export type Database = {
           is_active: boolean
           pdf_name: string
           position: string | null
+          token_expires_at: string | null
           user_id: string | null
         }
         Insert: {
           account_status?: string
           activated_at?: string | null
+          activation_token?: string | null
           club_id: string
           created_at?: string
           email?: string | null
@@ -436,11 +439,13 @@ export type Database = {
           is_active?: boolean
           pdf_name: string
           position?: string | null
+          token_expires_at?: string | null
           user_id?: string | null
         }
         Update: {
           account_status?: string
           activated_at?: string | null
+          activation_token?: string | null
           club_id?: string
           created_at?: string
           email?: string | null
@@ -450,6 +455,7 @@ export type Database = {
           is_active?: boolean
           pdf_name?: string
           position?: string | null
+          token_expires_at?: string | null
           user_id?: string | null
         }
         Relationships: [
@@ -477,6 +483,8 @@ export type Database = {
           cpi_score: number | null
           created_at: string
           id: string
+          notification_sent: boolean
+          notification_sent_at: string | null
           raw_metrics: Json | null
           report_data: Json | null
         }
@@ -487,6 +495,8 @@ export type Database = {
           cpi_score?: number | null
           created_at?: string
           id?: string
+          notification_sent?: boolean
+          notification_sent_at?: string | null
           raw_metrics?: Json | null
           report_data?: Json | null
         }
@@ -497,6 +507,8 @@ export type Database = {
           cpi_score?: number | null
           created_at?: string
           id?: string
+          notification_sent?: boolean
+          notification_sent_at?: string | null
           raw_metrics?: Json | null
           report_data?: Json | null
         }
