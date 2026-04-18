@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Edit2, Trash2, Mail, Save, X } from "lucide-react";
+import { Edit2, Trash2, Mail, Save, X, Copy } from "lucide-react";
 
 interface RosterPlayer {
   id: string;
@@ -196,6 +196,11 @@ const ClubRoster = () => {
                         {!p.email && (
                           <Button size="sm" variant="ghost" onClick={() => beginEdit(p)}>
                             <Mail size={14} className="mr-1" /> Add email
+                          </Button>
+                        )}
+                        {p.email && p.account_status !== "active" && (
+                          <Button size="sm" variant="ghost" onClick={() => copyInvite(p)} title="Copy invite link">
+                            <Copy size={14} className="mr-1" /> Copy invite
                           </Button>
                         )}
                         <Button size="sm" variant="ghost" onClick={() => beginEdit(p)}><Edit2 size={14} /></Button>
