@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
-import { ArrowRight, Check, ShieldCheck, Sparkles } from "lucide-react";
+import { ArrowRight, Check, ShieldCheck, Sparkles, Loader2 } from "lucide-react";
 import logo from "@/assets/logo.svg";
 import FootballDropdowns from "@/components/FootballDropdowns";
 
@@ -41,6 +41,9 @@ const ClubSignup = () => {
   const navigate = useNavigate();
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [submitting, setSubmitting] = useState(false);
+  const [bootstrapping, setBootstrapping] = useState(true);
+  // When set, the user is already authenticated and we're skipping straight to Step 2.
+  const [existingProfileId, setExistingProfileId] = useState<string | null>(null);
 
   // Step 1
   const [fullName, setFullName] = useState("");
@@ -57,6 +60,45 @@ const ClubSignup = () => {
   const [countryName, setCountryName] = useState("");
   const [leagueName, setLeagueName] = useState("");
   const [teamName, setTeamName] = useState("");
+
+  // If the user is already logged in (e.g. via Google) but has no club yet, jump
+  // straight to Step 2 — "About your club".
+  useEffect(() => {
+    let cancelled = false;
+    const init = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        if (!cancelled) setBootstrapping(false);
+        return;
+      }
+      const { data: prof } = await supabase
+        .from("profiles")
+        .select("id, full_name")
+        .eq("user_id", session.user.id)
+        .maybeSingle();
+      if (!prof) {
+        if (!cancelled) setBootstrapping(false);
+        return;
+      }
+      const { data: existingClub } = await supabase
+        .from("clubs")
+        .select("id")
+        .eq("admin_id", prof.id)
+        .maybeSingle();
+      if (existingClub) {
+        navigate("/club/dashboard", { replace: true });
+        return;
+      }
+      if (cancelled) return;
+      setExistingProfileId(prof.id);
+      setFullName(prof.full_name || session.user.user_metadata?.full_name || "");
+      setEmail(session.user.email || "");
+      setStep(2);
+      setBootstrapping(false);
+    };
+    init();
+    return () => { cancelled = true; };
+  }, [navigate]);
 
   const handleStep1 = (e: React.FormEvent) => {
     e.preventDefault();
