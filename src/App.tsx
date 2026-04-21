@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -7,7 +7,6 @@ import Index from "./pages/Index.tsx";
 import Analyze from "./pages/Analyze.tsx";
 import Report from "./pages/Report.tsx";
 import Login from "./pages/Login.tsx";
-import Signup from "./pages/Signup.tsx";
 import Dashboard from "./pages/Dashboard.tsx";
 import Explore from "./pages/Explore.tsx";
 import Settings from "./pages/Settings.tsx";
@@ -51,7 +50,7 @@ const App = () => (
           <Route path="/analyze" element={<Analyze />} />
           <Route path="/report/:id" element={<Report />} />
           <Route path="/login" element={<Login />} />
-          <Route path="/signup" element={<Signup />} />
+          <Route path="/signup" element={<Navigate to="/club/signup" replace />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/explore" element={<Explore />} />
           <Route path="/settings" element={<Settings />} />
