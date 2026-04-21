@@ -302,7 +302,7 @@ const Analyze = () => {
     const checkAuth = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        navigate("/signup?redirectTo=/analyze", { replace: true });
+        navigate("/club/signup", { replace: true });
         return;
       }
       setAuthUser(session.user);

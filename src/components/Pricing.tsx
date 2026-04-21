@@ -35,8 +35,8 @@ const Pricing = () => {
       price: "€0",
       period: "/ month",
       badge: null,
-      cta: "Create free account →",
-      onClick: () => navigate("/signup"),
+      cta: "Start your free club trial →",
+      onClick: () => navigate("/club/signup"),
       popular: false,
       features: [
         "3 reports per month",

@@ -39,7 +39,7 @@ const Hero = () => {
               Upload your team's GPS session file and get an instant AI-powered personal performance report — in under 90 seconds.
             </p>
             <div className="mt-8 flex flex-wrap gap-4">
-              <Button size="lg" onClick={() => navigate(isLoggedIn ? "/analyze" : "/signup")}>
+              <Button size="lg" onClick={() => navigate(isLoggedIn ? "/club/dashboard" : "/club/signup")}>
                 Start your analysis <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
               <Button size="lg" variant="outline" asChild>

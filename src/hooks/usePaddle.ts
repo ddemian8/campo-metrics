@@ -69,7 +69,7 @@ export function usePaddle() {
 
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
-      window.location.href = `/signup?redirectTo=/#pricing&plan=${plan}`;
+      window.location.href = `/club/signup?redirectTo=/#pricing&plan=${plan}`;
       return;
     }
 
