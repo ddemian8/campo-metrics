@@ -25,31 +25,35 @@ const Login = () => {
       .select("id, account_type")
       .eq("user_id", userId)
       .maybeSingle();
-    if (prof) {
-      const { data: club } = await supabase
-        .from("clubs")
-        .select("id")
-        .eq("admin_id", prof.id)
-        .limit(1)
-        .maybeSingle();
-      if (club || prof.account_type === "club_owner") {
-        navigate("/club/dashboard");
-        return;
-      }
-      // Club player → player dashboard
-      const { data: cp } = await supabase
-        .from("club_players")
-        .select("id")
-        .eq("user_id", prof.id)
-        .eq("is_active", true)
-        .limit(1)
-        .maybeSingle();
-      if (cp || prof.account_type === "club_player") {
-        navigate("/player/dashboard");
-        return;
-      }
+    if (!prof) {
+      navigate("/club/signup");
+      return;
     }
-    navigate(redirectTo);
+    // Owns a club → club dashboard
+    const { data: club } = await supabase
+      .from("clubs")
+      .select("id")
+      .eq("admin_id", prof.id)
+      .limit(1)
+      .maybeSingle();
+    if (club) {
+      navigate("/club/dashboard");
+      return;
+    }
+    // Active club player → player dashboard
+    const { data: cp } = await supabase
+      .from("club_players")
+      .select("id")
+      .eq("user_id", prof.id)
+      .eq("is_active", true)
+      .limit(1)
+      .maybeSingle();
+    if (cp || prof.account_type === "club_player") {
+      navigate("/player/dashboard");
+      return;
+    }
+    // Logged in but no club yet → finish creating their club
+    navigate("/club/signup");
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
