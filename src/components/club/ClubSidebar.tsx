@@ -26,7 +26,7 @@ const ClubSidebar = ({ clubName, clubLogo }: Props) => {
   };
 
   return (
-    <aside className="w-64 shrink-0 border-r border-border bg-card/40 backdrop-blur-xl flex flex-col h-screen sticky top-0">
+    <aside className="w-64 shrink-0 border-r border-border bg-card/40 backdrop-blur-xl flex flex-col h-[calc(100vh-50px)] sticky top-[50px]">
       <div className="p-6 border-b border-border">
         <img src={logo} alt="Campometric" className="h-10 mb-4" />
         <div className="flex items-center gap-3">
