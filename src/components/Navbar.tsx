@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Menu, X, LogOut, User, Shield, Upload, Users, LayoutDashboard } from "lucide-react";
+import { Menu, X, LogOut, User, Upload, Users, LayoutDashboard } from "lucide-react";
 import logo from "@/assets/logo.svg";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -16,31 +16,17 @@ const Navbar = () => {
   const [profileId, setProfileId] = useState<string | null>(null);
   const [hasClub, setHasClub] = useState(false);
   const [profileName, setProfileName] = useState("");
-  const [isAdmin, setIsAdmin] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
-    const checkAdmin = async (email: string) => {
-      const { data } = await supabase
-        .from("platform_settings")
-        .select("value")
-        .eq("key", "admin_emails")
-        .single();
-      const list = data?.value
-        ? data.value.split(",").map((e: string) => e.trim().toLowerCase())
-        : ["ddemian6@gmail.com"];
-      setIsAdmin(list.includes(email.toLowerCase()));
-    };
-
     const loadUser = async (session: any) => {
       setUser(session?.user ?? null);
       if (!session?.user) {
-        setProfileName(""); setIsAdmin(false); setProfileId(null); setHasClub(false);
+        setProfileName(""); setProfileId(null); setHasClub(false);
         return;
       }
       const meta = session.user.user_metadata;
       setProfileName(meta?.full_name || session.user.email || "");
-      checkAdmin(session.user.email || "");
       const { data: prof } = await supabase
         .from("profiles").select("id").eq("user_id", session.user.id).maybeSingle();
       if (prof?.id) {
