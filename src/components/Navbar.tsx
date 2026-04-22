@@ -87,14 +87,6 @@ const Navbar = () => {
         <div className="hidden md:flex items-center gap-3">
           {user ? (
             <>
-              {isAdmin && (
-                <Button variant="ghost" size="sm" asChild>
-                  <Link to="/admin">
-                    <Shield size={16} className="mr-1" />
-                    Admin
-                  </Link>
-                </Button>
-              )}
               <Button variant="ghost" size="sm" onClick={handleDashboardClick}>
                 <User size={16} className="mr-1" />
                 {profileName.split(" ")[0] || "Account"}
@@ -140,13 +132,6 @@ const Navbar = () => {
           <div className="flex flex-col gap-3 pt-2">
             {user ? (
               <>
-                {isAdmin && (
-                  <Button variant="ghost" size="sm" asChild>
-                    <Link to="/admin" onClick={() => setOpen(false)}>
-                      <Shield size={16} className="mr-1" /> Admin
-                    </Link>
-                  </Button>
-                )}
                 <Button variant="ghost" size="sm" onClick={() => { handleDashboardClick(); setOpen(false); }}>
                   {profileName.split(" ")[0] || "Account"}
                 </Button>
