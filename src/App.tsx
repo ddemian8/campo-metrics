@@ -24,6 +24,7 @@ import AdminContent from "./pages/admin/AdminContent.tsx";
 import AdminLeaderboard from "./pages/admin/AdminLeaderboard.tsx";
 import AdminSettings from "./pages/admin/AdminSettings.tsx";
 import AdminFootballDatabase from "./pages/admin/AdminFootballDatabase.tsx";
+import AdminLogin from "./pages/admin/AdminLogin.tsx";
 import ClubSignup from "./pages/club/ClubSignup.tsx";
 import ClubDashboard from "./pages/club/ClubDashboard.tsx";
 import ClubUpload from "./pages/club/ClubUpload.tsx";
@@ -59,6 +60,7 @@ const App = () => (
           <Route path="/privacy" element={<Privacy />} />
           <Route path="/refund" element={<Refund />} />
           <Route path="/admin" element={<AdminDashboard />} />
+          <Route path="/admin/login" element={<AdminLogin />} />
           <Route path="/admin/users" element={<AdminUsers />} />
           <Route path="/admin/reports" element={<AdminReports />} />
           <Route path="/admin/promo-codes" element={<AdminPromoCodes />} />
