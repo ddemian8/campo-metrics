@@ -24,6 +24,8 @@ const SETTINGS_KEYS = [
 const AdminPlatformSettings = () => {
   const { loading: authLoading, user } = useAdmin();
   const [settings, setSettings] = useState<Record<string, string>>({});
+  const [originalSettings, setOriginalSettings] = useState<Record<string, string>>({});
+  const [savingAll, setSavingAll] = useState(false);
   const [loading, setLoading] = useState(true);
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -36,13 +38,31 @@ const AdminPlatformSettings = () => {
       const map: Record<string, string> = {};
       (data || []).forEach(s => { map[s.key] = s.value; });
       setSettings(map);
+      setOriginalSettings(map);
       setLoading(false);
     });
   }, [authLoading]);
 
-  const save = async (key: string) => {
-    await supabase.from("platform_settings").update({ value: settings[key], updated_at: new Date().toISOString() }).eq("key", key);
-    toast.success(`${key} saved`);
+  const dirtyKeys = Object.keys(settings).filter(k => settings[k] !== originalSettings[k]);
+  const hasChanges = dirtyKeys.length > 0;
+
+  const saveAll = async () => {
+    if (!hasChanges) return;
+    setSavingAll(true);
+    const now = new Date().toISOString();
+    const results = await Promise.all(
+      dirtyKeys.map(k =>
+        supabase.from("platform_settings").update({ value: settings[k], updated_at: now }).eq("key", k)
+      )
+    );
+    const failed = results.filter(r => r.error);
+    setSavingAll(false);
+    if (failed.length) {
+      toast.error(`Failed to save ${failed.length} setting(s)`);
+    } else {
+      setOriginalSettings({ ...settings });
+      toast.success(`Saved ${dirtyKeys.length} setting${dirtyKeys.length === 1 ? "" : "s"}`);
+    }
   };
 
   if (authLoading || loading) return <AdminLayout><Loader2 className="animate-spin text-primary mx-auto mt-32" size={32} /></AdminLayout>;
@@ -117,7 +137,12 @@ const AdminPlatformSettings = () => {
         <CardContent className="p-6 space-y-6">
           {SETTINGS_KEYS.map(s => (
             <div key={s.key} className="flex items-center justify-between gap-4">
-              <label className="text-sm font-medium min-w-[200px]">{s.label}</label>
+              <label className="text-sm font-medium min-w-[200px] flex items-center gap-2">
+                {s.label}
+                {settings[s.key] !== originalSettings[s.key] && (
+                  <span className="h-1.5 w-1.5 rounded-full bg-primary" title="Unsaved change" />
+                )}
+              </label>
               {s.type === "toggle" ? (
                 <div className="flex items-center gap-3">
                   <Switch
@@ -126,7 +151,6 @@ const AdminPlatformSettings = () => {
                       setSettings({ ...settings, [s.key]: v ? "true" : "false" });
                     }}
                   />
-                  <Button size="sm" variant="outline" onClick={() => save(s.key)}><Save size={14} /></Button>
                 </div>
               ) : (
                 <div className="flex items-center gap-2 flex-1 max-w-md">
@@ -135,11 +159,34 @@ const AdminPlatformSettings = () => {
                     value={settings[s.key] || ""}
                     onChange={(e) => setSettings({ ...settings, [s.key]: e.target.value })}
                   />
-                  <Button size="sm" variant="outline" onClick={() => save(s.key)}><Save size={14} /></Button>
                 </div>
               )}
             </div>
           ))}
+
+          <div className="flex items-center justify-between pt-4 border-t border-border">
+            <p className="text-xs text-muted-foreground">
+              {hasChanges
+                ? `${dirtyKeys.length} unsaved change${dirtyKeys.length === 1 ? "" : "s"}`
+                : "All changes saved"}
+            </p>
+            <div className="flex gap-2">
+              {hasChanges && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setSettings({ ...originalSettings })}
+                  disabled={savingAll}
+                >
+                  Discard
+                </Button>
+              )}
+              <Button size="sm" onClick={saveAll} disabled={!hasChanges || savingAll}>
+                {savingAll ? <Loader2 size={14} className="animate-spin mr-2" /> : <Save size={14} className="mr-2" />}
+                Save all changes
+              </Button>
+            </div>
+          </div>
         </CardContent>
       </Card>
     </AdminLayout>
