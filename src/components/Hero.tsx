@@ -26,28 +26,43 @@ const Hero = () => {
     return () => subscription.unsubscribe();
   }, []);
 
+  const handleCta = async () => {
+    if (!isLoggedIn) {
+      navigate("/club/signup");
+      return;
+    }
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) { navigate("/club/signup"); return; }
+    const { data: prof } = await supabase
+      .from("profiles").select("id").eq("user_id", session.user.id).maybeSingle();
+    if (!prof) { navigate("/club/signup"); return; }
+    const { data: club } = await supabase
+      .from("clubs").select("id").eq("admin_id", prof.id).maybeSingle();
+    navigate(club ? "/club/dashboard" : "/club/signup");
+  };
+
   return (
     <section className="relative pt-32 pb-20 md:pt-40 md:pb-28 overflow-hidden">
       <div className="container">
         <div className="grid lg:grid-cols-2 gap-12 items-center">
           <AnimateIn>
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold leading-tight tracking-tight">
-              Your GPS data.{" "}
-              <span className="text-gradient">Your performance story.</span>
+              GPS Performance Analytics{" "}
+              <span className="text-gradient">for Your Team</span>
             </h1>
             <p className="mt-6 text-lg text-muted-foreground max-w-xl leading-relaxed">
               Upload your team's GPS session file and get an instant AI-powered personal performance report — in under 90 seconds.
             </p>
             <div className="mt-8 flex flex-wrap gap-4">
-              <Button size="lg" onClick={() => navigate(isLoggedIn ? "/club/dashboard" : "/club/signup")}>
-                Start your analysis <ArrowRight className="ml-2 h-4 w-4" />
+              <Button size="lg" onClick={handleCta}>
+                Start Free Trial — 30 Days Free <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
               <Button size="lg" variant="outline" asChild>
                 <a href="#sample-report">See a sample report</a>
               </Button>
             </div>
             <p className="mt-6 text-sm text-muted-foreground">
-              Free to start · Create an account in 30 seconds · Works with STATSports, Catapult & more
+              No credit card required · 30-day free trial · Works with STATSports, Catapult & more
             </p>
           </AnimateIn>
 
