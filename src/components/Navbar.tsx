@@ -1,21 +1,20 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Menu, X, LogOut, User, Shield } from "lucide-react";
+import { Menu, X, LogOut, User, Shield, Upload, Users, LayoutDashboard } from "lucide-react";
 import logo from "@/assets/logo.svg";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 
-const navLinks = [
+const guestLinks = [
   { label: "How it works", href: "#how-it-works" },
   { label: "Pricing", href: "#pricing" },
-  { label: "For Clubs", href: "/club/signup", isRoute: true },
-  { label: "Explore", href: "/explore", isRoute: true },
-  { label: "Affiliate", href: "/affiliate", isRoute: true },
 ];
 
 const Navbar = () => {
   const [open, setOpen] = useState(false);
   const [user, setUser] = useState<any>(null);
+  const [profileId, setProfileId] = useState<string | null>(null);
+  const [hasClub, setHasClub] = useState(false);
   const [profileName, setProfileName] = useState("");
   const [isAdmin, setIsAdmin] = useState(false);
   const navigate = useNavigate();
@@ -33,26 +32,29 @@ const Navbar = () => {
       setIsAdmin(list.includes(email.toLowerCase()));
     };
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const loadUser = async (session: any) => {
       setUser(session?.user ?? null);
-      if (session?.user) {
-        const meta = session.user.user_metadata;
-        setProfileName(meta?.full_name || session.user.email || "");
-        checkAdmin(session.user.email || "");
-      } else {
-        setProfileName("");
-        setIsAdmin(false);
+      if (!session?.user) {
+        setProfileName(""); setIsAdmin(false); setProfileId(null); setHasClub(false);
+        return;
       }
-    });
+      const meta = session.user.user_metadata;
+      setProfileName(meta?.full_name || session.user.email || "");
+      checkAdmin(session.user.email || "");
+      const { data: prof } = await supabase
+        .from("profiles").select("id").eq("user_id", session.user.id).maybeSingle();
+      if (prof?.id) {
+        setProfileId(prof.id);
+        const { data: club } = await supabase
+          .from("clubs").select("id").eq("admin_id", prof.id).maybeSingle();
+        setHasClub(!!club);
+      }
+    };
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        const meta = session.user.user_metadata;
-        setProfileName(meta?.full_name || session.user.email || "");
-        checkAdmin(session.user.email || "");
-      }
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      loadUser(session);
     });
+    supabase.auth.getSession().then(({ data: { session } }) => loadUser(session));
 
     return () => subscription.unsubscribe();
   }, []);
@@ -60,6 +62,10 @@ const Navbar = () => {
   const handleLogout = async () => {
     await supabase.auth.signOut();
     navigate("/");
+  };
+
+  const handleDashboardClick = () => {
+    navigate(hasClub ? "/club/dashboard" : "/club/signup");
   };
 
   return (
@@ -71,16 +77,24 @@ const Navbar = () => {
 
         {/* Desktop */}
         <div className="hidden md:flex items-center gap-6">
-          {navLinks.map((l) =>
-            (l as any).isRoute ? (
-              <Link key={l.label} to={l.href} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-                {l.label}
+          {user ? (
+            <>
+              <Link to="/club/dashboard" className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5">
+                <LayoutDashboard size={14} /> Dashboard
               </Link>
-            ) : (
+              <Link to="/club/dashboard/upload" className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5">
+                <Upload size={14} /> Upload Session
+              </Link>
+              <Link to="/club/dashboard/roster" className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5">
+                <Users size={14} /> Roster
+              </Link>
+            </>
+          ) : (
+            guestLinks.map((l) => (
               <a key={l.label} href={l.href} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
                 {l.label}
               </a>
-            )
+            ))
           )}
         </div>
 
@@ -95,11 +109,9 @@ const Navbar = () => {
                   </Link>
                 </Button>
               )}
-              <Button variant="ghost" size="sm" asChild>
-                <Link to="/dashboard">
-                  <User size={16} className="mr-1" />
-                  {profileName.split(" ")[0] || "Dashboard"}
-                </Link>
+              <Button variant="ghost" size="sm" onClick={handleDashboardClick}>
+                <User size={16} className="mr-1" />
+                {profileName.split(" ")[0] || "Account"}
               </Button>
               <Button variant="ghost" size="sm" onClick={handleLogout}>
                 <LogOut size={16} className="mr-1" /> Log out
@@ -108,10 +120,10 @@ const Navbar = () => {
           ) : (
             <>
               <Button variant="ghost" size="sm" asChild>
-                <Link to="/login">Log in</Link>
+                <Link to="/login">Login</Link>
               </Button>
               <Button size="sm" asChild>
-                <Link to="/club/signup">Start Free Trial</Link>
+                <Link to="/club/signup">Start Free Trial →</Link>
               </Button>
             </>
           )}
