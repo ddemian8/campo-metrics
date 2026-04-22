@@ -5,7 +5,6 @@ import TrustBar from "@/components/TrustBar";
 import HowItWorks from "@/components/HowItWorks";
 import ReportPreview from "@/components/ReportPreview";
 import Flywheel from "@/components/Flywheel";
-import BrowsePlayers from "@/components/BrowsePlayers";
 import Pricing from "@/components/Pricing";
 import Testimonials from "@/components/Testimonials";
 import AffiliateBanner from "@/components/AffiliateBanner";
@@ -21,7 +20,6 @@ const Index = () => {
     <div className="min-h-screen">
       <Navbar />
       <Hero />
-      <BrowsePlayers />
       <TrustBar />
       <HowItWorks />
       <ReportPreview />

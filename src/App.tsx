@@ -7,8 +7,6 @@ import Index from "./pages/Index.tsx";
 import Analyze from "./pages/Analyze.tsx";
 import Report from "./pages/Report.tsx";
 import Login from "./pages/Login.tsx";
-import Dashboard from "./pages/Dashboard.tsx";
-import Explore from "./pages/Explore.tsx";
 import Settings from "./pages/Settings.tsx";
 import PlayerProfile from "./pages/PlayerProfile.tsx";
 import ResetPassword from "./pages/ResetPassword.tsx";
@@ -51,8 +49,8 @@ const App = () => (
           <Route path="/report/:id" element={<Report />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Navigate to="/club/signup" replace />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/explore" element={<Explore />} />
+          <Route path="/dashboard" element={<Navigate to="/club/dashboard" replace />} />
+          <Route path="/explore" element={<Navigate to="/" replace />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/player/:username" element={<PlayerProfile />} />
           <Route path="/reset-password" element={<ResetPassword />} />
