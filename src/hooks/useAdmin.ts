@@ -13,7 +13,7 @@ export const useAdmin = () => {
   useEffect(() => {
     const check = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { navigate("/login"); return; }
+      if (!session) { navigate("/admin/login"); return; }
       const email = session.user.email?.toLowerCase() || "";
       // Also check platform_settings for dynamic admin list
       const { data: setting } = await supabase
@@ -24,7 +24,11 @@ export const useAdmin = () => {
       const adminList = setting?.value
         ? setting.value.split(",").map((e: string) => e.trim().toLowerCase())
         : ADMIN_EMAILS;
-      if (!adminList.includes(email)) { navigate("/dashboard"); return; }
+      if (!adminList.includes(email)) {
+        await supabase.auth.signOut();
+        navigate("/admin/login");
+        return;
+      }
       setUser(session.user);
       setIsAdmin(true);
       setLoading(false);
