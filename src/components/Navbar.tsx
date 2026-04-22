@@ -138,16 +138,18 @@ const Navbar = () => {
       {/* Mobile menu */}
       {open && (
         <div className="md:hidden border-t border-border bg-background px-6 pb-6 pt-4 space-y-4">
-          {navLinks.map((l) =>
-            (l as any).isRoute ? (
-              <Link key={l.label} to={l.href} onClick={() => setOpen(false)} className="block text-sm text-muted-foreground hover:text-foreground">
-                {l.label}
-              </Link>
-            ) : (
+          {user ? (
+            <>
+              <Link to="/club/dashboard" onClick={() => setOpen(false)} className="block text-sm text-muted-foreground hover:text-foreground">Dashboard</Link>
+              <Link to="/club/dashboard/upload" onClick={() => setOpen(false)} className="block text-sm text-muted-foreground hover:text-foreground">Upload Session</Link>
+              <Link to="/club/dashboard/roster" onClick={() => setOpen(false)} className="block text-sm text-muted-foreground hover:text-foreground">Roster</Link>
+            </>
+          ) : (
+            guestLinks.map((l) => (
               <a key={l.label} href={l.href} onClick={() => setOpen(false)} className="block text-sm text-muted-foreground hover:text-foreground">
                 {l.label}
               </a>
-            )
+            ))
           )}
           <div className="flex flex-col gap-3 pt-2">
             {user ? (
@@ -159,8 +161,11 @@ const Navbar = () => {
                     </Link>
                   </Button>
                 )}
+                <Button variant="ghost" size="sm" onClick={() => { handleDashboardClick(); setOpen(false); }}>
+                  {profileName.split(" ")[0] || "Account"}
+                </Button>
                 <Button variant="ghost" size="sm" asChild>
-                  <Link to="/dashboard" onClick={() => setOpen(false)}>Dashboard</Link>
+                  <Link to="/settings" onClick={() => setOpen(false)}>Settings</Link>
                 </Button>
                 <Button variant="ghost" size="sm" onClick={() => { handleLogout(); setOpen(false); }}>
                   Log out
@@ -169,10 +174,10 @@ const Navbar = () => {
             ) : (
               <>
                 <Button variant="ghost" size="sm" asChild>
-                  <Link to="/login" onClick={() => setOpen(false)}>Log in</Link>
+                  <Link to="/login" onClick={() => setOpen(false)}>Login</Link>
                 </Button>
                 <Button size="sm" asChild>
-                  <Link to="/club/signup" onClick={() => setOpen(false)}>Start Free Trial</Link>
+                  <Link to="/club/signup" onClick={() => setOpen(false)}>Start Free Trial →</Link>
                 </Button>
               </>
             )}
