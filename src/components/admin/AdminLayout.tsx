@@ -2,11 +2,12 @@ import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, Users, FileText, Tag, DollarSign, UserPlus,
-  Settings, BarChart3, Trophy, Menu, ChevronLeft, Globe, Eye
+  Settings, BarChart3, Trophy, Menu, ChevronLeft, Globe, Eye, LogOut, ExternalLink
 } from "lucide-react";
 import logo from "@/assets/logo.svg";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client";
 
 const NAV = [
   { label: "Dashboard", path: "/admin", icon: LayoutDashboard },
@@ -26,10 +27,33 @@ const AdminLayout = ({ children }: { children: React.ReactNode }) => {
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
 
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    navigate("/admin/login", { replace: true });
+  };
+
   return (
-    <div className="min-h-screen bg-background flex">
+    <div className="min-h-screen bg-background">
+      <header className="fixed top-0 left-0 right-0 z-50 h-[50px] border-b border-border bg-card/95 backdrop-blur-xl flex items-center justify-between px-4 md:px-6">
+        <div className="flex items-center gap-2">
+          <ShieldBadge />
+          <span className="text-sm font-semibold text-foreground">Campometric Admin</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="sm" asChild>
+            <a href="/" target="_blank" rel="noreferrer">
+              <ExternalLink size={14} className="mr-1" /> View Site
+            </a>
+          </Button>
+          <Button variant="ghost" size="sm" onClick={handleLogout}>
+            <LogOut size={14} className="mr-1" /> Log out
+          </Button>
+        </div>
+      </header>
+
+      <div className="flex pt-[50px]">
       <aside className={cn(
-        "fixed left-0 top-0 bottom-0 z-40 flex flex-col border-r border-border bg-card transition-all duration-200",
+        "fixed left-0 top-[50px] bottom-0 z-40 flex flex-col border-r border-border bg-card transition-all duration-200",
         collapsed ? "w-16" : "w-60"
       )}>
         <div className="flex items-center justify-between p-4 border-b border-border">
@@ -74,10 +98,6 @@ const AdminLayout = ({ children }: { children: React.ReactNode }) => {
             <Eye size={14} />
             {!collapsed && "View as User"}
           </Button>
-          <Link to="/dashboard" className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground px-1">
-            <ChevronLeft size={14} />
-            {!collapsed && "Back to Dashboard"}
-          </Link>
         </div>
       </aside>
 
@@ -86,8 +106,17 @@ const AdminLayout = ({ children }: { children: React.ReactNode }) => {
           {children}
         </div>
       </main>
+      </div>
     </div>
   );
 };
 
 export default AdminLayout;
+
+const ShieldBadge = () => (
+  <span className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-primary/10 text-primary">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+    </svg>
+  </span>
+);
