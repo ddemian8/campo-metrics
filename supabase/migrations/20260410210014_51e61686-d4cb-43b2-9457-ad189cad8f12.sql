@@ -1,1 +1,0 @@
-CREATE POLICY "Anyone can update anonymous sessions" ON public.anonymous_sessions FOR UPDATE TO public USING (true) WITH CHECK (true);
